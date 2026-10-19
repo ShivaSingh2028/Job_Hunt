@@ -11,8 +11,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#7c3aed"
     },
-    "assetBundlePatterns": ["**/*"],
-    "ios": { "supportsTablet": true },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
       "package": "com.jobhunt.campus",
       "adaptiveIcon": {
@@ -24,7 +28,9 @@
         "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
-    "web": { "favicon": "./assets/favicon.png" },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "scheme": "jobhunt",
     "plugins": [
       "expo-router",
@@ -32,9 +38,21 @@
       "expo-secure-store",
       [
         "expo-splash-screen",
-        { "backgroundColor": "#7c3aed", "image": "./assets/splash-icon.png", "imageWidth": 200 }
+        {
+          "backgroundColor": "#7c3aed",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
       ]
     ],
-    "experiments": { "typedRoutes": true }
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d60f2223-45e0-446d-b4b3-c513ba2994e1"
+      }
+    }
   }
 }
