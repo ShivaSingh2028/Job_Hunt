@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 14.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_API_BASE_URL": "https://jobhunt-backend-api.onrender.com/api/v1"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_USE_MOCK": "false",
+        "EXPO_PUBLIC_API_BASE_URL": "https://jobhunt-backend-api.onrender.com/api/v1"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
