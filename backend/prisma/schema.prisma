@@ -1,0 +1,132 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                String         @id @default(uuid())
+  email             String         @unique
+  passwordHash      String
+  name              String
+  phone             String?
+  avatarUrl         String?
+  activeMode        String         @default("SEEKER") // "SEEKER" | "RECRUITER"
+  cancellationCount Int            @default(0)
+  isBlocked         Boolean        @default(false)
+  blockedUntil      DateTime?
+  locationLat       Float?
+  locationLng       Float?
+  locationLabel     String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  postedJobs        Job[]          @relation("UserPostedJobs")
+  applications      Application[]  @relation("UserApplications")
+  savedJobs         SavedJob[]
+  notifications     Notification[]
+  reportsFiled      Report[]       @relation("UserReportsFiled")
+}
+
+model Job {
+  id            String        @id @default(uuid())
+  posterId      String
+  poster        User          @relation("UserPostedJobs", fields: [posterId], references: [id], onDelete: Cascade)
+  type          String        // "SHORT_TERM" | "LONG_TERM"
+  title         String
+  description   String
+  pay           Float
+  payUnit       String        // "FIXED" | "PER_HOUR" | "PER_MONTH"
+  openings      Int           @default(1)
+  filledCount   Int           @default(0)
+  isRemote      Boolean       @default(false)
+  locationLat   Float         @default(0.0)
+  locationLng   Float         @default(0.0)
+  locationLabel String        @default("HIDDEN")
+  startDate     String        // YYYY-MM-DD
+  endDate       String?       // YYYY-MM-DD
+  startTime     String?       // HH:mm
+  endTime       String?       // HH:mm
+  status        String        @default("OPEN") // "OPEN" | "FILLED" | "COMPLETED" | "CANCELLED"
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  applications  Application[]
+  savedBy       SavedJob[]
+}
+
+model Application {
+  id          String    @id @default(uuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seekerId    String
+  seeker      User      @relation("UserApplications", fields: [seekerId], references: [id], onDelete: Cascade)
+  status      String    @default("ACCEPTED") // "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+  acceptedAt  DateTime  @default(now())
+  cancelledAt DateTime?
+
+  @@unique([jobId, seekerId, status])
+}
+
+model SavedJob {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId])
+}
+
+model Notification {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // "JOB_ACCEPTED" | "SEEKER_CANCELLED" | "RECRUITER_CANCELLED" | "BLOCKED" | "REMINDER" | "REPORT_RESOLVED"
+  title        String
+  body         String
+  isRead       Boolean  @default(false)
+  relatedJobId String?
+  createdAt    DateTime @default(now())
+}
+
+model Report {
+  id          String    @id @default(uuid())
+  targetType  String    // "JOB" | "USER"
+  targetId    String
+  targetTitle String    @default("")
+  reporterId  String
+  reporter    User      @relation("UserReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason      String    // "SPAM" | "INAPPROPRIATE" | "FRAUD" | "HARASSMENT" | "OTHER"
+  description String
+  status      String    @default("PENDING") // "PENDING" | "REVIEWED" | "RESOLVED"
+  adminNote   String?
+  resolvedBy  String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("ADMIN")
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+}
+
+model ActionLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  adminName  String
+  action     String   // "BLOCK_USER" | "UNBLOCK_USER" | "REMOVE_JOB" | "RESOLVE_REPORT" | "LOGIN"
+  targetType String   // "USER" | "JOB" | "REPORT" | "SESSION"
+  targetId   String?
+  note       String?
+  createdAt  DateTime @default(now())
+}

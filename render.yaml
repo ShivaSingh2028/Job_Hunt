@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: jobhunt-backend-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run render:build
+    startCommand: npm run start
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DATABASE_URL
+        value: file:./dev.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
