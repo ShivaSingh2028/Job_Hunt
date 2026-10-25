@@ -40,7 +40,10 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(form.name.trim(), form.email.trim().toLowerCase(), form.password, form.phone || undefined);
-      router.replace('/(auth)/location-permission');
+      router.replace({
+        pathname: '/(auth)/verify-otp',
+        params: { email: form.email.trim().toLowerCase(), next: '/(auth)/location-permission' },
+      } as any);
     } catch (err: any) {
       if (err?.code === 'CONFLICT') setErrors({ email: 'Email already registered' });
       else Alert.alert('Registration Failed', err?.message || 'Please try again.');

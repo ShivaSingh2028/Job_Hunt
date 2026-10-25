@@ -20,6 +20,7 @@ export interface AuthRequest extends Request {
     name: string;
     role?: string;
     activeMode?: string;
+    isVerified?: boolean;
     isBlocked?: boolean;
     blockedUntil?: Date | null;
   };
@@ -94,6 +95,7 @@ export async function authenticateToken(
       name: user.name,
       role: 'USER',
       activeMode: user.activeMode,
+      isVerified: user.isVerified,
       isBlocked: user.isBlocked,
       blockedUntil: user.blockedUntil,
     };

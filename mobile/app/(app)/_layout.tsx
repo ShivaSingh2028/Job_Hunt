@@ -110,14 +110,13 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
-          name="map"
+          name="messages"
           options={{
-            href: isSeeker ? '/map' : null,
             tabBarIcon: ({ focused }) => (
               <TabIcon
-                name="map-outline"
-                focusedName="map"
-                label="Map"
+                name="chatbubbles-outline"
+                focusedName="chatbubbles"
+                label="Chat"
                 focused={focused}
               />
             ),
@@ -164,6 +163,19 @@ export default function AppLayout() {
           }}
         />
         {/* Hidden sub-routes inside the app stack */}
+        <Tabs.Screen
+          name="map"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="chat/[id]"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
         <Tabs.Screen
           name="job/[id]"
           options={{

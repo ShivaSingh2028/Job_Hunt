@@ -36,5 +36,15 @@ export function useAuth() {
     } catch {}
   };
 
-  return { user, tokens, isAuthenticated, isLoading, login, register, logout, refreshProfile };
+  const sendVerificationOtp = async (email: string) => {
+    return await authService.sendVerificationOtp(email);
+  };
+
+  const verifyEmailOtp = async (email: string, otp: string) => {
+    const res = await authService.verifyEmailOtp(email, otp);
+    setUser(res.user);
+    return res;
+  };
+
+  return { user, tokens, isAuthenticated, isLoading, login, register, logout, refreshProfile, sendVerificationOtp, verifyEmailOtp };
 }

@@ -199,6 +199,15 @@ export default function HomeScreen() {
               color={Object.keys(filters).length > 0 ? colors.primary : colors.textSecondary}
             />
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/map')}
+            style={{
+              padding: 6,
+              borderRadius: radii.sm,
+            }}
+          >
+            <Ionicons name="map-outline" size={18} color={colors.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Active filter chips */}

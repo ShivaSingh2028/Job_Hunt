@@ -267,6 +267,15 @@ jobsRouter.post('/', authenticateToken, async (req: AuthRequest, res: Response) 
     return sendError(res, 'USER_BLOCKED', 'Your account is currently blocked.', 403);
   }
 
+  if (user.isVerified === false) {
+    return sendError(
+      res,
+      'USER_NOT_VERIFIED',
+      'Please verify your college email address with the 6-digit OTP code before posting gigs.',
+      403
+    );
+  }
+
   if (user.activeMode !== 'RECRUITER') {
     return sendError(res, 'FORBIDDEN', 'Switch to Recruiter mode first.', 403);
   }
@@ -346,6 +355,15 @@ jobsRouter.post('/:id/accept', authenticateToken, async (req: AuthRequest, res: 
 
   if (user.isBlocked) {
     return sendError(res, 'USER_BLOCKED', 'Your account is blocked.', 403);
+  }
+
+  if (user.isVerified === false) {
+    return sendError(
+      res,
+      'USER_NOT_VERIFIED',
+      'Please verify your college email address with the 6-digit OTP code before accepting gigs.',
+      403
+    );
   }
 
   if (user.activeMode !== 'SEEKER') {
@@ -447,6 +465,34 @@ jobsRouter.post('/:id/accept', authenticateToken, async (req: AuthRequest, res: 
           status: 'ACCEPTED',
         },
       });
+
+      // Auto-create chat conversation between seeker and recruiter
+      const existingConv = await tx.conversation.findUnique({
+        where: {
+          jobId_seekerId: {
+            jobId: job.id,
+            seekerId: user.id,
+          },
+        },
+      });
+
+      if (!existingConv) {
+        const newConv = await tx.conversation.create({
+          data: {
+            jobId: job.id,
+            seekerId: user.id,
+            recruiterId: job.posterId,
+          },
+        });
+
+        await tx.message.create({
+          data: {
+            conversationId: newConv.id,
+            senderId: user.id,
+            text: `Hi! I just accepted the "${job.title}" gig. Looking forward to connecting!`,
+          },
+        });
+      }
 
       // Create notifications
       await tx.notification.create({

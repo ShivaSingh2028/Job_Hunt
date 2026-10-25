@@ -10,6 +10,7 @@ export const MOCK_USER: User = {
   phone: '+1-555-0101',
   avatarUrl: null,
   activeMode: 'SEEKER',
+  isVerified: true,
   cancellationCount: 0,
   isBlocked: false,
   blockedUntil: null,

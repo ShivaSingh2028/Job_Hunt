@@ -1,6 +1,7 @@
-import type { IAuthService, IJobService, IUserService, INotificationService, IReportService } from './types';
-import type { User, Job, Application, JobPost, Notification, AuthResponse, CreateJobPayload, JobFilters, ReportPayload } from '../types';
+import type { IAuthService, IJobService, IUserService, INotificationService, IReportService, IChatService } from './types';
+import type { User, Job, Application, JobPost, Notification, AuthResponse, CreateJobPayload, JobFilters, ReportPayload, Conversation, ChatMessage } from '../types';
 import { MOCK_USER, MOCK_JOBS, MOCK_APPLICATIONS, MOCK_POSTS, MOCK_NOTIFICATIONS } from './mockData';
+import { subDays } from 'date-fns';
 
 const delay = (ms = 600) => new Promise(res => setTimeout(res, ms));
 const err = (code: string, message: string) => { const e = new Error(message) as any; e.code = code; throw e; };
@@ -26,6 +27,25 @@ export const mockAuthService: IAuthService = {
     return { user: _user, accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' };
   },
   async forgotPassword(_email) { await delay(700); },
+  async sendVerificationOtp(email: string) {
+    await delay(500);
+    return {
+      message: 'Verification code sent to your email',
+      email,
+      demoOtp: '123456',
+    };
+  },
+  async verifyEmailOtp(email: string, otp: string) {
+    await delay(600);
+    if (otp !== '123456') {
+      err('INVALID_OTP', 'Invalid verification code. Enter 123456 for demo.');
+    }
+    _user = { ..._user, isVerified: true };
+    return {
+      message: 'Email verified successfully',
+      user: _user,
+    };
+  },
   async logout(_refreshToken) { await delay(300); },
   async refreshToken(_refreshToken) {
     await delay(200);
@@ -233,5 +253,135 @@ export const mockReportService: IReportService = {
   async submitReport(_payload: ReportPayload) {
     await delay(700);
     return { reportId: `report-${Date.now()}` };
+  },
+};
+
+const now = new Date();
+
+let _mockConversations: Conversation[] = [
+  {
+    id: 'conv-1',
+    jobId: 'job-1',
+    jobTitle: 'Event Setup Helper',
+    jobType: 'SHORT_TERM',
+    peer: {
+      id: 'user-2',
+      name: 'Priya Sharma',
+      email: 'priya@college.edu',
+      avatarUrl: null,
+      isVerified: true,
+      role: 'RECRUITER',
+    },
+    lastMessage: {
+      id: 'msg-3',
+      text: 'Perfect! See you at 8:50 AM by the north auditorium gate.',
+      senderId: 'user-2',
+      createdAt: subDays(now, 1).toISOString(),
+      isRead: false,
+    },
+    updatedAt: subDays(now, 1).toISOString(),
+  },
+];
+
+let _mockMessages: Record<string, ChatMessage[]> = {
+  'conv-1': [
+    {
+      id: 'msg-1',
+      conversationId: 'conv-1',
+      senderId: 'user-2',
+      senderName: 'Priya Sharma',
+      text: 'Hi Alex! Thanks for accepting the Event Setup Helper gig.',
+      isRead: true,
+      createdAt: subDays(now, 1).toISOString(),
+    },
+    {
+      id: 'msg-2',
+      conversationId: 'conv-1',
+      senderId: 'user-1',
+      senderName: 'Alex Johnson',
+      text: 'Glad to help! Should I bring any equipment or just show up?',
+      isRead: true,
+      createdAt: subDays(now, 1).toISOString(),
+    },
+    {
+      id: 'msg-3',
+      conversationId: 'conv-1',
+      senderId: 'user-2',
+      senderName: 'Priya Sharma',
+      text: 'Perfect! See you at 8:50 AM by the north auditorium gate.',
+      isRead: false,
+      createdAt: subDays(now, 1).toISOString(),
+    },
+  ],
+};
+
+export const mockChatService: IChatService = {
+  async getConversations() {
+    await delay(300);
+    return [..._mockConversations];
+  },
+  async getMessages(conversationId: string) {
+    await delay(300);
+    const msgs = _mockMessages[conversationId] || [];
+    _mockMessages[conversationId] = msgs.map(m => ({ ...m, isRead: true }));
+    const conv = _mockConversations.find(c => c.id === conversationId);
+    if (conv && conv.lastMessage) {
+      conv.lastMessage.isRead = true;
+    }
+    return _mockMessages[conversationId];
+  },
+  async sendMessage(conversationId: string, text: string) {
+    await delay(200);
+    const newMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      conversationId,
+      senderId: _user.id,
+      senderName: _user.name,
+      text,
+      isRead: true,
+      createdAt: new Date().toISOString(),
+    };
+    if (!_mockMessages[conversationId]) {
+      _mockMessages[conversationId] = [];
+    }
+    _mockMessages[conversationId].push(newMsg);
+    const conv = _mockConversations.find(c => c.id === conversationId);
+    if (conv) {
+      conv.lastMessage = {
+        id: newMsg.id,
+        text: newMsg.text,
+        senderId: newMsg.senderId,
+        createdAt: newMsg.createdAt,
+        isRead: true,
+      };
+      conv.updatedAt = newMsg.createdAt;
+    }
+    return newMsg;
+  },
+  async getOrCreateJobChat(jobId: string, _seekerId?: string) {
+    await delay(300);
+    let conv = _mockConversations.find(c => c.jobId === jobId);
+    if (!conv) {
+      const job = _jobs.find(j => j.id === jobId);
+      conv = {
+        id: `conv-${Date.now()}`,
+        jobId,
+        jobTitle: job?.title || 'Campus Gig',
+        jobType: job?.type || 'SHORT_TERM',
+        peer: {
+          id: job?.postedBy.id || 'user-recruiter',
+          name: job?.postedBy.name || 'Recruiter',
+          email: 'recruiter@college.edu',
+          avatarUrl: null,
+          isVerified: true,
+          role: 'RECRUITER',
+        },
+        lastMessage: null,
+        updatedAt: new Date().toISOString(),
+      };
+      _mockConversations.unshift(conv);
+      _mockMessages[conv.id] = [];
+    }
+    return { conversationId: conv.id };
   },
 };

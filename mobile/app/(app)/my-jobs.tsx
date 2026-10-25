@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuthStore } from '../../src/store/authStore';
-import { jobService } from '../../src/services';
+import { jobService, chatService } from '../../src/services';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { Badge } from '../../src/components/ui/Badge';
@@ -281,14 +281,38 @@ export default function MyJobsScreen() {
                   </View>
                 </View>
 
-                {isCanCancel && (
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: 4 }}>
                   <Button
-                    label="Withdraw Commitment"
-                    variant="danger"
+                    label="Chat with Recruiter"
+                    variant="primary"
                     size="sm"
-                    onPress={() => handleCancelApplication(item.job.id, item.job.title)}
+                    style={{ flex: 1 }}
+                    onPress={async () => {
+                      try {
+                        const chat = await chatService.getOrCreateJobChat(item.job.id);
+                        router.push({
+                          pathname: '/(app)/chat/[id]',
+                          params: {
+                            id: chat.conversationId,
+                            jobTitle: item.job.title,
+                            peerName: item.job.postedBy.name,
+                            peerRole: 'RECRUITER',
+                          },
+                        } as any);
+                      } catch (e: any) {
+                        Alert.alert('Error', e?.message || 'Could not start chat');
+                      }
+                    }}
                   />
-                )}
+                  {isCanCancel && (
+                    <Button
+                      label="Withdraw"
+                      variant="danger"
+                      size="sm"
+                      onPress={() => handleCancelApplication(item.job.id, item.job.title)}
+                    />
+                  )}
+                </View>
               </View>
             );
           }}
@@ -380,13 +404,42 @@ export default function MyJobsScreen() {
                     </Text>
                     {item.acceptedSeekers.map(s => (
                       <View key={s.applicationId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
                           <Ionicons name="person-circle-outline" size={18} color={colors.primary} />
                           <Text style={{ ...typography.bodySm, color: colors.text, fontWeight: '600' }}>
                             {s.seeker.name}
                           </Text>
                         </View>
-                        <Text style={{ ...typography.caption, color: colors.textMuted }}>{s.seeker.email}</Text>
+                        <TouchableOpacity
+                          onPress={async () => {
+                            try {
+                              const chat = await chatService.getOrCreateJobChat(item.id, s.seeker.id);
+                              router.push({
+                                pathname: '/(app)/chat/[id]',
+                                params: {
+                                  id: chat.conversationId,
+                                  jobTitle: item.title,
+                                  peerName: s.seeker.name,
+                                  peerRole: 'SEEKER',
+                                },
+                              } as any);
+                            } catch (e: any) {
+                              Alert.alert('Error', e?.message || 'Could not start chat');
+                            }
+                          }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            backgroundColor: colors.primaryLight,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: radii.sm,
+                          }}
+                        >
+                          <Ionicons name="chatbubbles-outline" size={13} color={colors.primary} />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Chat</Text>
+                        </TouchableOpacity>
                       </View>
                     ))}
                   </View>

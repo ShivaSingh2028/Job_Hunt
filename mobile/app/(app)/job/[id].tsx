@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/hooks/useTheme';
 import { useAuthStore } from '../../../src/store/authStore';
 import { useJobStore } from '../../../src/store/jobStore';
-import { jobService } from '../../../src/services';
+import { jobService, chatService } from '../../../src/services';
 import { Button } from '../../../src/components/ui/Button';
 import { Badge } from '../../../src/components/ui/Badge';
 import { LoadingSpinner } from '../../../src/components/ui/LoadingSpinner';
@@ -53,6 +53,17 @@ export default function JobDetailScreen() {
 
   const handleAccept = async () => {
     if (!job) return;
+    if (user && !user.isVerified) {
+      Alert.alert(
+        'Student Verification Required',
+        'Please verify your college email identity before accepting campus gigs.',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Verify Now', onPress: () => router.push('/(auth)/verify-otp' as any) },
+        ]
+      );
+      return;
+    }
     if (user?.isBlocked) {
       Alert.alert('Account Blocked', 'You cannot accept gigs while blocked.');
       return;
@@ -138,6 +149,26 @@ export default function JobDetailScreen() {
         },
       ]
     );
+  };
+
+  const handleOpenChat = async () => {
+    if (!job) return;
+    setActionLoading(true);
+    try {
+      const res = await chatService.getOrCreateJobChat(job.id);
+      router.push({
+        pathname: '/(app)/chat/[id]',
+        params: {
+          id: res.conversationId,
+          jobTitle: job.title,
+          peerName: job.postedBy.name,
+        },
+      } as any);
+    } catch (err: any) {
+      Alert.alert('Chat Error', err?.message || 'Could not open conversation.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleToggleSave = async () => {
@@ -402,16 +433,23 @@ export default function JobDetailScreen() {
         ...shadow.lg,
       }}>
         {isAccepted ? (
-          <View style={{ gap: spacing.xs }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}>
+          <View style={{ gap: spacing.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Ionicons name="checkmark-circle" size={18} color={colors.success} />
               <Text style={{ ...typography.headingSm, color: colors.success }}>Gig Confirmed</Text>
             </View>
             <Button
-              label="Cancel Acceptance"
-              variant="danger"
-              onPress={handleCancelAcceptance}
+              label="Chat with Recruiter"
+              variant="primary"
+              onPress={handleOpenChat}
               loading={actionLoading}
+              fullWidth
+            />
+            <Button
+              label="Cancel Acceptance"
+              variant="outline"
+              onPress={handleCancelAcceptance}
+              disabled={actionLoading}
               fullWidth
             />
           </View>

@@ -1,9 +1,11 @@
-import type { Job, User, Application, JobPost, Notification, AuthResponse, CreateJobPayload, JobFilters, ReportPayload } from '../types';
+import type { Job, User, Application, JobPost, Notification, AuthResponse, CreateJobPayload, JobFilters, ReportPayload, Conversation, ChatMessage } from '../types';
 
 export interface IAuthService {
   login(email: string, password: string): Promise<AuthResponse>;
   register(name: string, email: string, password: string, phone?: string): Promise<AuthResponse>;
   forgotPassword(email: string): Promise<void>;
+  sendVerificationOtp(email: string): Promise<{ message: string; email: string; demoOtp?: string }>;
+  verifyEmailOtp(email: string, otp: string): Promise<{ message: string; user: User }>;
   logout(refreshToken: string): Promise<void>;
   refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }>;
 }
@@ -36,4 +38,11 @@ export interface INotificationService {
 
 export interface IReportService {
   submitReport(payload: ReportPayload): Promise<{ reportId: string }>;
+}
+
+export interface IChatService {
+  getConversations(): Promise<Conversation[]>;
+  getMessages(conversationId: string): Promise<ChatMessage[]>;
+  sendMessage(conversationId: string, text: string): Promise<ChatMessage>;
+  getOrCreateJobChat(jobId: string, seekerId?: string): Promise<{ conversationId: string }>;
 }

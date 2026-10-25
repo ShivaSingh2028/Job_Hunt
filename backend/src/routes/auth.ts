@@ -24,6 +24,7 @@ export async function formatUserResponse(userId: string) {
     phone: user.phone,
     avatarUrl: user.avatarUrl,
     activeMode: user.activeMode,
+    isVerified: user.isVerified,
     cancellationCount: user.cancellationCount,
     isBlocked: user.isBlocked,
     blockedUntil: user.blockedUntil ? user.blockedUntil.toISOString() : null,
@@ -178,5 +179,92 @@ authRouter.post('/forgot-password', async (req: Request, res: Response) => {
   // Mock sending reset link
   return sendSuccess(res, {
     message: `Password reset instructions sent if ${email} is registered.`,
+  });
+});
+
+// POST /api/v1/auth/send-verification-otp
+authRouter.post('/send-verification-otp', async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return sendError(res, 'VALIDATION_ERROR', 'College email is required', 400);
+  }
+
+  const normalized = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email: normalized },
+  });
+
+  if (!user) {
+    return sendError(res, 'NOT_FOUND', 'No account found with this email', 404);
+  }
+
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      verificationOtp: otp,
+      verificationOtpExpiresAt: expiresAt,
+    },
+  });
+
+  console.log(`\n========================================`);
+  console.log(`[CAMPUS SECURITY] 📧 COLLEGE VERIFICATION OTP`);
+  console.log(`Recipient: ${normalized}`);
+  console.log(`6-Digit OTP: ${otp}`);
+  console.log(`Expires: ${expiresAt.toISOString()}`);
+  console.log(`========================================\n`);
+
+  return sendSuccess(res, {
+    message: `Verification code sent to ${normalized}. Please check your inbox.`,
+    email: normalized,
+    expiresAt: expiresAt.toISOString(),
+    demoOtp: otp, // Returned for instant demo testing
+  });
+});
+
+// POST /api/v1/auth/verify-email-otp
+authRouter.post('/verify-email-otp', async (req: Request, res: Response) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return sendError(res, 'VALIDATION_ERROR', 'Email and 6-digit OTP code are required', 400);
+  }
+
+  const normalized = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email: normalized },
+  });
+
+  if (!user) {
+    return sendError(res, 'NOT_FOUND', 'User not found', 404);
+  }
+
+  // Accept valid OTP or master demo OTP '123456'
+  const isMasterOtp = otp.trim() === '123456';
+  const isMatch = user.verificationOtp === otp.trim();
+  const isNotExpired = user.verificationOtpExpiresAt && new Date() <= user.verificationOtpExpiresAt;
+
+  if (!isMasterOtp && (!isMatch || !isNotExpired)) {
+    return sendError(res, 'INVALID_OTP', 'Invalid or expired verification code. Please request a new one.', 400);
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      isVerified: true,
+      verificationOtp: null,
+      verificationOtpExpiresAt: null,
+    },
+  });
+
+  const formatted = await formatUserResponse(updated.id);
+
+  return sendSuccess(res, {
+    message: 'College email successfully verified! You can now accept and post gigs.',
+    user: formatted,
   });
 });

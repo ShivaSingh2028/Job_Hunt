@@ -9,6 +9,8 @@ async function main() {
   // Clear existing data
   await prisma.actionLog.deleteMany();
   await prisma.report.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.conversation.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.savedJob.deleteMany();
   await prisma.application.deleteMany();
@@ -39,6 +41,7 @@ async function main() {
       passwordHash: hashedUserPw,
       phone: '+91 98765 43210',
       activeMode: 'SEEKER',
+      isVerified: true,
       cancellationCount: 0,
       isBlocked: false,
       locationLat: 28.6139,
@@ -55,6 +58,7 @@ async function main() {
       passwordHash: hashedUserPw,
       phone: '+91 98765 11111',
       activeMode: 'RECRUITER',
+      isVerified: true,
       locationLat: 28.6145,
       locationLng: 77.2085,
       locationLabel: 'Arts Faculty, Campus',
@@ -69,6 +73,7 @@ async function main() {
       passwordHash: hashedUserPw,
       phone: '+91 98765 22222',
       activeMode: 'RECRUITER',
+      isVerified: true,
       locationLat: 28.6200,
       locationLng: 77.2100,
       locationLabel: 'Sports Complex',
@@ -83,6 +88,7 @@ async function main() {
       passwordHash: hashedUserPw,
       phone: '+91 98765 33333',
       activeMode: 'RECRUITER',
+      isVerified: true,
       locationLat: 28.6139,
       locationLng: 77.2090,
       locationLabel: 'Incubation Centre',
@@ -97,6 +103,7 @@ async function main() {
       passwordHash: hashedUserPw,
       phone: '+91 98765 44444',
       activeMode: 'RECRUITER',
+      isVerified: true,
       locationLat: 28.6130,
       locationLng: 77.2080,
       locationLabel: 'Central Library',
@@ -111,6 +118,7 @@ async function main() {
       passwordHash: hashedUserPw,
       phone: '+91 98765 55555',
       activeMode: 'RECRUITER',
+      isVerified: true,
       locationLat: 28.6142,
       locationLng: 77.2092,
       locationLabel: 'Student Union Building',
@@ -246,6 +254,39 @@ async function main() {
       seekerId: alex.id,
       status: 'ACCEPTED',
     },
+  });
+
+  // 4b. Create initial Chat Conversation for Job 1
+  const conversation1 = await prisma.conversation.create({
+    data: {
+      id: 'conv-1',
+      jobId: job1.id,
+      seekerId: alex.id,
+      recruiterId: priya.id,
+    },
+  });
+
+  await prisma.message.createMany({
+    data: [
+      {
+        id: 'msg-1',
+        conversationId: conversation1.id,
+        senderId: priya.id,
+        text: 'Hi Alex! Thanks for accepting the Event Setup Helper gig.',
+      },
+      {
+        id: 'msg-2',
+        conversationId: conversation1.id,
+        senderId: alex.id,
+        text: 'Hey Priya, happy to help! Should I bring gloves or work shoes?',
+      },
+      {
+        id: 'msg-3',
+        conversationId: conversation1.id,
+        senderId: priya.id,
+        text: 'Just comfortable shoes! We provide work gloves and refreshments. See you at Gate 3.',
+      },
+    ],
   });
 
   // 5. Create Saved Job (Alex saved job-3)

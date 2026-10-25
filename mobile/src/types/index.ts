@@ -32,6 +32,7 @@ export interface User {
   phone: string | null;
   avatarUrl: string | null;
   activeMode: UserMode;
+  isVerified: boolean;
   cancellationCount: number;
   isBlocked: boolean;
   blockedUntil: string | null;
@@ -167,4 +168,39 @@ export interface JobFilters {
   minPay?: number;
   maxPay?: number;
   keyword?: string;
+}
+
+// ─── Chat & Messaging ─────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  jobType: string;
+  peer: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    isVerified: boolean;
+    role: 'SEEKER' | 'RECRUITER';
+  };
+  lastMessage: {
+    id: string;
+    text: string;
+    senderId: string;
+    createdAt: string;
+    isRead: boolean;
+  } | null;
+  updatedAt: string;
 }

@@ -8,54 +8,61 @@ generator client {
 }
 
 model User {
-  id                String         @id @default(uuid())
-  email             String         @unique
-  passwordHash      String
-  name              String
-  phone             String?
-  avatarUrl         String?
-  activeMode        String         @default("SEEKER") // "SEEKER" | "RECRUITER"
-  cancellationCount Int            @default(0)
-  isBlocked         Boolean        @default(false)
-  blockedUntil      DateTime?
-  locationLat       Float?
-  locationLng       Float?
-  locationLabel     String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                         String         @id @default(uuid())
+  email                      String         @unique
+  passwordHash               String
+  name                       String
+  phone                      String?
+  avatarUrl                  String?
+  activeMode                 String         @default("SEEKER") // "SEEKER" | "RECRUITER"
+  isVerified                 Boolean        @default(false)
+  verificationOtp            String?
+  verificationOtpExpiresAt   DateTime?
+  cancellationCount          Int            @default(0)
+  isBlocked                  Boolean        @default(false)
+  blockedUntil               DateTime?
+  locationLat                Float?
+  locationLng                Float?
+  locationLabel              String?
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
 
-  postedJobs        Job[]          @relation("UserPostedJobs")
-  applications      Application[]  @relation("UserApplications")
-  savedJobs         SavedJob[]
-  notifications     Notification[]
-  reportsFiled      Report[]       @relation("UserReportsFiled")
+  postedJobs                 Job[]          @relation("UserPostedJobs")
+  applications               Application[]  @relation("UserApplications")
+  savedJobs                  SavedJob[]
+  notifications              Notification[]
+  reportsFiled               Report[]       @relation("UserReportsFiled")
+  conversationsAsSeeker      Conversation[] @relation("SeekerConversations")
+  conversationsAsRecruiter   Conversation[] @relation("RecruiterConversations")
+  sentMessages               Message[]
 }
 
 model Job {
-  id            String        @id @default(uuid())
+  id            String         @id @default(uuid())
   posterId      String
-  poster        User          @relation("UserPostedJobs", fields: [posterId], references: [id], onDelete: Cascade)
-  type          String        // "SHORT_TERM" | "LONG_TERM"
+  poster        User           @relation("UserPostedJobs", fields: [posterId], references: [id], onDelete: Cascade)
+  type          String         // "SHORT_TERM" | "LONG_TERM"
   title         String
   description   String
   pay           Float
-  payUnit       String        // "FIXED" | "PER_HOUR" | "PER_MONTH"
-  openings      Int           @default(1)
-  filledCount   Int           @default(0)
-  isRemote      Boolean       @default(false)
-  locationLat   Float         @default(0.0)
-  locationLng   Float         @default(0.0)
-  locationLabel String        @default("HIDDEN")
-  startDate     String        // YYYY-MM-DD
-  endDate       String?       // YYYY-MM-DD
-  startTime     String?       // HH:mm
-  endTime       String?       // HH:mm
-  status        String        @default("OPEN") // "OPEN" | "FILLED" | "COMPLETED" | "CANCELLED"
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  payUnit       String         // "FIXED" | "PER_HOUR" | "PER_MONTH"
+  openings      Int            @default(1)
+  filledCount   Int            @default(0)
+  isRemote      Boolean        @default(false)
+  locationLat   Float          @default(0.0)
+  locationLng   Float          @default(0.0)
+  locationLabel String         @default("HIDDEN")
+  startDate     String         // YYYY-MM-DD
+  endDate       String?        // YYYY-MM-DD
+  startTime     String?        // HH:mm
+  endTime       String?        // HH:mm
+  status        String         @default("OPEN") // "OPEN" | "FILLED" | "COMPLETED" | "CANCELLED"
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   applications  Application[]
   savedBy       SavedJob[]
+  conversations Conversation[]
 }
 
 model Application {
@@ -69,6 +76,32 @@ model Application {
   cancelledAt DateTime?
 
   @@unique([jobId, seekerId, status])
+}
+
+model Conversation {
+  id          String    @id @default(uuid())
+  jobId       String
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seekerId    String
+  seeker      User      @relation("SeekerConversations", fields: [seekerId], references: [id], onDelete: Cascade)
+  recruiterId String
+  recruiter   User      @relation("RecruiterConversations", fields: [recruiterId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  messages    Message[]
+
+  @@unique([jobId, seekerId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text           String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
 }
 
 model SavedJob {
@@ -86,7 +119,7 @@ model Notification {
   id           String   @id @default(uuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type         String   // "JOB_ACCEPTED" | "SEEKER_CANCELLED" | "RECRUITER_CANCELLED" | "BLOCKED" | "REMINDER" | "REPORT_RESOLVED"
+  type         String   // "JOB_ACCEPTED" | "SEEKER_CANCELLED" | "RECRUITER_CANCELLED" | "BLOCKED" | "REMINDER" | "REPORT_RESOLVED" | "NEW_MESSAGE"
   title        String
   body         String
   isRead       Boolean  @default(false)

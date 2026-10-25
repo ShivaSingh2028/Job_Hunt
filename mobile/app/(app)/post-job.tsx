@@ -61,6 +61,17 @@ export default function PostJobScreen() {
   };
 
   const handlePost = async () => {
+    if (user && !user.isVerified) {
+      Alert.alert(
+        'Student Verification Required',
+        'Please verify your college email identity before posting campus gigs.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Verify Now', onPress: () => router.push('/(auth)/verify-otp' as any) },
+        ]
+      );
+      return;
+    }
     if (!validate()) return;
     setLoading(true);
     try {

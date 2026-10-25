@@ -79,6 +79,65 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Verification Status Card */}
+        <View style={{
+          backgroundColor: user?.isVerified ? `${colors.success}10` : `${colors.warning}15`,
+          borderRadius: radii.lg,
+          padding: spacing.lg,
+          borderWidth: 1,
+          borderColor: user?.isVerified ? `${colors.success}40` : `${colors.warning}40`,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: spacing.md,
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, flex: 1 }}>
+            <View style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: user?.isVerified ? `${colors.success}20` : `${colors.warning}20`,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Ionicons
+                name={user?.isVerified ? "shield-checkmark" : "shield-outline"}
+                size={22}
+                color={user?.isVerified ? colors.success : colors.warning}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ ...typography.headingSm, fontWeight: '700', color: colors.text }}>
+                  {user?.isVerified ? 'College ID Verified' : 'ID Not Verified'}
+                </Text>
+                {user?.isVerified && (
+                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                )}
+              </View>
+              <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }}>
+                {user?.isVerified
+                  ? 'Authenticated student account. Full access unlocked.'
+                  : 'Verify with college email OTP to post and accept jobs.'}
+              </Text>
+            </View>
+          </View>
+
+          {!user?.isVerified && (
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/verify-otp' as any)}
+              style={{
+                backgroundColor: colors.primary,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: radii.md,
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Verify</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Cancellation Record & Reliability Score */}
         <View style={{
           backgroundColor: user?.isBlocked ? colors.error : colors.card,

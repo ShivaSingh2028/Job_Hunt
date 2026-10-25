@@ -1,11 +1,13 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { io, Socket } from 'socket.io-client';
 import type {
   IAuthService,
   IJobService,
   IUserService,
   INotificationService,
   IReportService,
+  IChatService,
 } from './types';
 import type {
   User,
@@ -17,6 +19,8 @@ import type {
   CreateJobPayload,
   JobFilters,
   ReportPayload,
+  Conversation,
+  ChatMessage,
 } from '../types';
 
 // Default to host IP on local Wi-Fi, with localhost for Web
@@ -85,6 +89,20 @@ export const realAuthService: IAuthService = {
     await request('/auth/forgot-password', {
       method: 'POST',
       body: JSON.stringify({ email }),
+    });
+  },
+
+  async sendVerificationOtp(email): Promise<{ message: string; email: string; demoOtp?: string }> {
+    return request<{ message: string; email: string; demoOtp?: string }>('/auth/send-verification-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async verifyEmailOtp(email, otp): Promise<{ message: string; user: User }> {
+    return request<{ message: string; user: User }>('/auth/verify-email-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
     });
   },
 
@@ -248,3 +266,40 @@ export const realReportService: IReportService = {
     });
   },
 };
+
+export const realChatService: IChatService = {
+  async getConversations(): Promise<Conversation[]> {
+    return request<Conversation[]>('/chat/conversations');
+  },
+
+  async getMessages(conversationId: string): Promise<ChatMessage[]> {
+    return request<ChatMessage[]>(`/chat/conversations/${conversationId}/messages`);
+  },
+
+  async sendMessage(conversationId: string, text: string): Promise<ChatMessage> {
+    return request<ChatMessage>(`/chat/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  },
+
+  async getOrCreateJobChat(jobId: string, seekerId?: string): Promise<{ conversationId: string }> {
+    return request<{ conversationId: string }>(`/chat/job/${jobId}`, {
+      method: 'POST',
+      body: JSON.stringify({ seekerId }),
+    });
+  },
+};
+
+let _socketInstance: Socket | null = null;
+
+export function getChatSocket(): Socket {
+  if (!_socketInstance) {
+    const socketUrl = BASE_URL.replace(/\/api\/v1\/?$/, '');
+    _socketInstance = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+    });
+  }
+  return _socketInstance;
+}
