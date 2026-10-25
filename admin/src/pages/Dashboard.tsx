@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Users, Briefcase, AlertTriangle, ShieldAlert, CheckCircle2, TrendingUp, Clock,
+  Users, Briefcase, AlertTriangle, ShieldAlert,
 } from 'lucide-react';
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area, PieChart, Pie, Cell,
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell,
 } from 'recharts';
 import { adminService } from '../services/adminService';
 import type { DashboardStats } from '../types';

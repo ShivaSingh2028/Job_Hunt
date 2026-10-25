@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, ShieldAlert, ShieldCheck, Briefcase, AlertTriangle, Calendar, Phone, Mail, Clock,
+  ArrowLeft, ShieldAlert, ShieldCheck, Briefcase, AlertTriangle, Calendar, Phone, Mail,
 } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import type { PlatformUser, AdminJob, AdminReport, BlockDuration } from '../types';

@@ -2,7 +2,6 @@ import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import type { AdminJob } from '../../types';
-import { MapPin, DollarSign, Clock, Users } from 'lucide-react';
 
 interface Props {
   jobs: AdminJob[];

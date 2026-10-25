@@ -37,9 +37,13 @@ export default function JobDetailScreen() {
     try {
       const data = await jobService.getJobById(id);
       setJob(data);
-      const apps = await jobService.getMyApplications();
-      const accepted = apps.some(a => a.job.id === id && (a.status === 'ACCEPTED' || a.status === 'IN_PROGRESS'));
-      setIsAccepted(accepted);
+      if (user?.activeMode === 'SEEKER') {
+        const apps = await jobService.getMyApplications().catch(() => []);
+        const accepted = apps.some(a => a.job.id === id && (a.status === 'ACCEPTED' || a.status === 'IN_PROGRESS'));
+        setIsAccepted(accepted);
+      } else {
+        setIsAccepted(false);
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to load gig details');
     } finally {

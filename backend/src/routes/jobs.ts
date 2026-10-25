@@ -167,10 +167,15 @@ jobsRouter.get('/my-posts', authenticateToken, async (req: AuthRequest, res: Res
       return {
         ...base,
         acceptedSeekers: job.applications.map((a) => ({
-          id: a.seeker.id,
-          name: a.seeker.name,
-          avatarUrl: a.seeker.avatarUrl,
+          applicationId: a.id,
+          status: a.status,
           acceptedAt: a.acceptedAt.toISOString(),
+          seeker: {
+            id: a.seeker.id,
+            name: a.seeker.name,
+            email: a.seeker.email,
+            avatarUrl: a.seeker.avatarUrl,
+          },
         })),
       };
     })

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, RefreshControl, Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
@@ -61,9 +61,11 @@ export default function MyJobsScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [isSeeker]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [isSeeker])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -402,46 +404,54 @@ export default function MyJobsScreen() {
                     <Text style={{ ...typography.label, color: colors.text, fontWeight: '700' }}>
                       Confirmed Students:
                     </Text>
-                    {item.acceptedSeekers.map(s => (
-                      <View key={s.applicationId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                          <Ionicons name="person-circle-outline" size={18} color={colors.primary} />
-                          <Text style={{ ...typography.bodySm, color: colors.text, fontWeight: '600' }}>
-                            {s.seeker.name}
-                          </Text>
+                    {item.acceptedSeekers.map(s => {
+                      const seekerName = s.seeker?.name || (s as any).name || 'Student';
+                      const seekerEmail = s.seeker?.email || '';
+                      const seekerId = s.seeker?.id || (s as any).id;
+                      return (
+                        <View key={s.applicationId || seekerId} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                            <Ionicons name="person-circle-outline" size={18} color={colors.primary} />
+                            <Text style={{ ...typography.bodySm, color: colors.text, fontWeight: '600' }}>
+                              {seekerName}
+                            </Text>
+                          </View>
+                          {seekerEmail ? (
+                            <Text style={{ ...typography.caption, color: colors.textMuted, marginRight: 8 }}>{seekerEmail}</Text>
+                          ) : null}
+                          <TouchableOpacity
+                            onPress={async () => {
+                              try {
+                                const chat = await chatService.getOrCreateJobChat(item.id, seekerId);
+                                router.push({
+                                  pathname: '/(app)/chat/[id]',
+                                  params: {
+                                    id: chat.conversationId,
+                                    jobTitle: item.title,
+                                    peerName: seekerName,
+                                    peerRole: 'SEEKER',
+                                  },
+                                } as any);
+                              } catch (e: any) {
+                                Alert.alert('Error', e?.message || 'Could not start chat');
+                              }
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              backgroundColor: colors.primaryLight,
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: radii.sm,
+                            }}
+                          >
+                            <Ionicons name="chatbubbles-outline" size={13} color={colors.primary} />
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Chat</Text>
+                          </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                          onPress={async () => {
-                            try {
-                              const chat = await chatService.getOrCreateJobChat(item.id, s.seeker.id);
-                              router.push({
-                                pathname: '/(app)/chat/[id]',
-                                params: {
-                                  id: chat.conversationId,
-                                  jobTitle: item.title,
-                                  peerName: s.seeker.name,
-                                  peerRole: 'SEEKER',
-                                },
-                              } as any);
-                            } catch (e: any) {
-                              Alert.alert('Error', e?.message || 'Could not start chat');
-                            }
-                          }}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 4,
-                            backgroundColor: colors.primaryLight,
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: radii.sm,
-                          }}
-                        >
-                          <Ionicons name="chatbubbles-outline" size={13} color={colors.primary} />
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Chat</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 ) : (
                   <Text style={{ ...typography.caption, color: colors.textMuted }}>

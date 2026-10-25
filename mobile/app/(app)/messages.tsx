@@ -8,13 +8,13 @@ import {
   TextInput,
   StyleSheet,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuthStore } from '../../src/store/authStore';
-import { chatService } from '../../src/services';
+import { chatService, getChatSocket } from '../../src/services';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { ErrorState } from '../../src/components/ui/ErrorState';
@@ -45,9 +45,34 @@ export default function MessagesScreen() {
     }
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchConversations(true);
+    }, [fetchConversations])
+  );
+
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+    try {
+      const socket = getChatSocket();
+      if (user?.id) {
+        socket.emit('join_user', user.id);
+      }
+
+      const handleLiveMessage = () => {
+        fetchConversations(true);
+      };
+
+      socket.on('new_message', handleLiveMessage);
+      socket.on('message_notification', handleLiveMessage);
+
+      return () => {
+        socket.off('new_message', handleLiveMessage);
+        socket.off('message_notification', handleLiveMessage);
+      };
+    } catch {
+      return () => {};
+    }
+  }, [user?.id, fetchConversations]);
 
   const onRefresh = () => {
     setRefreshing(true);

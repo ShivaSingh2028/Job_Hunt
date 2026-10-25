@@ -33,10 +33,12 @@ export default function VerifyOtpScreen() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const hasSentRef = useRef(false);
 
   // Send OTP on mount if user just arrived
   useEffect(() => {
-    if (targetEmail) {
+    if (targetEmail && !hasSentRef.current) {
+      hasSentRef.current = true;
       handleSendOtp(false);
     }
   }, [targetEmail]);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Flag, CheckCircle2, AlertCircle, Clock, MessageSquare, Check } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Clock, Check } from 'lucide-react';
 import { adminService } from '../services/adminService';
 import type { AdminReport, ReportStatus } from '../types';
 

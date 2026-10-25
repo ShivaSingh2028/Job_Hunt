@@ -31,7 +31,7 @@ const DEFAULT_URL =
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_URL;
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const token = await SecureStore.getItemAsync('accessToken').catch(() => null);
 
   const headers: Record<string, string> = {
@@ -51,6 +51,28 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     const e = new Error('Network request failed. Is the JobHunt backend running?') as any;
     e.code = 'NETWORK_ERROR';
     throw e;
+  }
+
+  // Automatic token refresh on 401
+  if (res.status === 401 && !isRetry && endpoint !== '/auth/login' && endpoint !== '/auth/refresh') {
+    const refreshToken = await SecureStore.getItemAsync('refreshToken').catch(() => null);
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        const refreshData = await refreshRes.json().catch(() => null);
+        if (refreshRes.ok && refreshData?.data?.accessToken) {
+          await SecureStore.setItemAsync('accessToken', refreshData.data.accessToken);
+          if (refreshData.data.refreshToken) {
+            await SecureStore.setItemAsync('refreshToken', refreshData.data.refreshToken);
+          }
+          return request<T>(endpoint, options, true);
+        }
+      } catch {}
+    }
   }
 
   const json = await res.json().catch(() => null);
@@ -300,6 +322,8 @@ export function getChatSocket(): Socket {
       transports: ['websocket', 'polling'],
       autoConnect: true,
     });
+  } else if (!_socketInstance.connected) {
+    _socketInstance.connect();
   }
   return _socketInstance;
 }

@@ -37,10 +37,16 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [peerDetails, setPeerDetails] = useState({
+    name: params.peerName || '',
+    jobTitle: params.jobTitle || '',
+    role: params.peerRole || '',
+    isVerified: params.isVerified === '1' || params.isVerified === 'true',
+  });
 
   const flatListRef = useRef<FlatList>(null);
 
-  // Fetch initial message history
+  // Fetch initial message history and fallback details if needed
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -53,6 +59,21 @@ export default function ChatScreen() {
         console.warn('Failed to load chat messages', err);
       } finally {
         if (isMounted) setLoading(false);
+      }
+
+      if (!params.peerName) {
+        try {
+          const convs = await chatService.getConversations();
+          const current = convs.find(c => c.id === conversationId);
+          if (current && isMounted) {
+            setPeerDetails({
+              name: current.peer.name,
+              jobTitle: current.jobTitle,
+              role: current.peer.role,
+              isVerified: current.peer.isVerified,
+            });
+          }
+        } catch {}
       }
     })();
 
@@ -77,6 +98,7 @@ export default function ChatScreen() {
 
       return () => {
         isMounted = false;
+        socket.emit('leave_conversation', conversationId);
         socket.off('new_message', handleIncomingMessage);
       };
     } catch {
@@ -128,7 +150,10 @@ export default function ChatScreen() {
     }
   };
 
-  const isPeerVerified = params.isVerified === '1' || params.isVerified === 'true';
+  const displayName = peerDetails.name || params.peerName || 'Chat Partner';
+  const displayTitle = peerDetails.jobTitle || params.jobTitle || '';
+  const displayRole = peerDetails.role || params.peerRole || '';
+  const isPeerVerified = peerDetails.isVerified || params.isVerified === '1' || params.isVerified === 'true';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
@@ -172,7 +197,7 @@ export default function ChatScreen() {
             }}
           >
             <Text style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>
-              {getInitials(params.peerName)}
+              {getInitials(displayName)}
             </Text>
           </View>
           {isPeerVerified && (
@@ -200,9 +225,9 @@ export default function ChatScreen() {
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={{ ...typography.headingSm, color: colors.text, fontWeight: '700' }} numberOfLines={1}>
-              {params.peerName || 'Chat Partner'}
+              {displayName}
             </Text>
-            {params.peerRole && (
+            {displayRole ? (
               <View
                 style={{
                   backgroundColor: `${colors.primary}15`,
@@ -212,16 +237,16 @@ export default function ChatScreen() {
                 }}
               >
                 <Text style={{ fontSize: 9, fontWeight: '700', color: colors.primary }}>
-                  {params.peerRole}
+                  {displayRole}
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
-          {params.jobTitle && (
+          {displayTitle ? (
             <Text style={{ ...typography.caption, color: colors.textSecondary }} numberOfLines={1}>
-              💼 {params.jobTitle}
+              💼 {displayTitle}
             </Text>
-          )}
+          ) : null}
         </View>
       </View>
 

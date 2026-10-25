@@ -131,6 +131,7 @@ export async function optionalAuthenticate(
         name: user.name,
         role: 'USER',
         activeMode: user.activeMode,
+        isVerified: user.isVerified,
         isBlocked: user.isBlocked,
         blockedUntil: user.blockedUntil,
       };

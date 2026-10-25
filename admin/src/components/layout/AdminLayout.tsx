@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Briefcase, Flag, History, LogOut, Shield,
+  LayoutDashboard, Users, Briefcase, Flag, History, LogOut,
 } from 'lucide-react';
 import { useAdminAuthStore } from '../../store/adminAuthStore';
 
