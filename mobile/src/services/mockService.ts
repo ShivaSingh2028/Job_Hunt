@@ -32,13 +32,12 @@ export const mockAuthService: IAuthService = {
     return {
       message: 'Verification code sent to your email',
       email,
-      demoOtp: '123456',
     };
   },
   async verifyEmailOtp(email: string, otp: string) {
     await delay(600);
-    if (otp !== '123456') {
-      err('INVALID_OTP', 'Invalid verification code. Enter 123456 for demo.');
+    if (!otp || otp.length !== 6) {
+      err('INVALID_OTP', 'Invalid verification code. Please enter the 6-digit code sent to your email.');
     }
     _user = { ..._user, isVerified: true };
     return {

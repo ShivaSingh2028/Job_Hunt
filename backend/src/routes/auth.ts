@@ -222,7 +222,6 @@ authRouter.post('/send-verification-otp', async (req: Request, res: Response) =>
     message: `Verification code sent to ${normalized}. Please check your inbox.`,
     email: normalized,
     expiresAt: expiresAt.toISOString(),
-    demoOtp: otp, // Returned for instant demo testing
   });
 });
 
@@ -243,12 +242,10 @@ authRouter.post('/verify-email-otp', async (req: Request, res: Response) => {
     return sendError(res, 'NOT_FOUND', 'User not found', 404);
   }
 
-  // Accept valid OTP or master demo OTP '123456'
-  const isMasterOtp = otp.trim() === '123456';
   const isMatch = user.verificationOtp === otp.trim();
   const isNotExpired = user.verificationOtpExpiresAt && new Date() <= user.verificationOtpExpiresAt;
 
-  if (!isMasterOtp && (!isMatch || !isNotExpired)) {
+  if (!isMatch || !isNotExpired) {
     return sendError(res, 'INVALID_OTP', 'Invalid or expired verification code. Please request a new one.', 400);
   }
 

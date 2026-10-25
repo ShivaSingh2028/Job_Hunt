@@ -30,7 +30,6 @@ export default function VerifyOtpScreen() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [cooldown, setCooldown] = useState(60);
-  const [demoCode, setDemoCode] = useState<string | null>('123456');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -55,10 +54,7 @@ export default function VerifyOtpScreen() {
     if (!targetEmail) return;
     if (isManualResend) setResending(true);
     try {
-      const res = await sendVerificationOtp(targetEmail);
-      if (res.demoOtp) {
-        setDemoCode(res.demoOtp);
-      }
+      await sendVerificationOtp(targetEmail);
       setStatusMessage('Verification code sent! Check your inbox.');
       setCooldown(60);
     } catch (err: any) {
@@ -184,26 +180,6 @@ export default function VerifyOtpScreen() {
                 We sent a 6-digit confirmation code to:
               </Text>
               <Text style={{ ...typography.headingSm, color: colors.primary }}>{targetEmail || 'your email'}</Text>
-            </View>
-
-            {/* Demo Helper Pill */}
-            <View style={{
-              backgroundColor: `${colors.info}15`,
-              borderRadius: radii.md,
-              padding: spacing.md,
-              borderLeftWidth: 3,
-              borderLeftColor: colors.info,
-              gap: 4,
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="bulb-outline" size={16} color={colors.info} />
-                <Text style={{ ...typography.bodySm, fontWeight: '700', color: colors.info }}>
-                  Instant Verification Demo
-                </Text>
-              </View>
-              <Text style={{ ...typography.bodySm, color: colors.textSecondary }}>
-                Use test code <Text style={{ fontWeight: '700', color: colors.text }}>{demoCode || '123456'}</Text> for instant verification without waiting.
-              </Text>
             </View>
 
             {/* 6 Digit Input Boxes */}

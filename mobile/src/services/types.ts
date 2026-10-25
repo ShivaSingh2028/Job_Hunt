@@ -4,7 +4,7 @@ export interface IAuthService {
   login(email: string, password: string): Promise<AuthResponse>;
   register(name: string, email: string, password: string, phone?: string): Promise<AuthResponse>;
   forgotPassword(email: string): Promise<void>;
-  sendVerificationOtp(email: string): Promise<{ message: string; email: string; demoOtp?: string }>;
+  sendVerificationOtp(email: string): Promise<{ message: string; email: string }>;
   verifyEmailOtp(email: string, otp: string): Promise<{ message: string; user: User }>;
   logout(refreshToken: string): Promise<void>;
   refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }>;

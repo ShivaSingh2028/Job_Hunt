@@ -18,12 +18,12 @@ const DEFAULT_ADMIN: AdminUser = {
 };
 
 export const useAdminAuthStore = create<AdminAuthState>((set) => ({
-  admin: DEFAULT_ADMIN,
-  token: 'mock-admin-token-xyz',
-  isAuthenticated: true, // Default authenticated for effortless college demo!
+  admin: null,
+  token: null,
+  isAuthenticated: false,
   login: (email, password) => {
     if (email === 'admin@jobhunt.campus' && password === 'admin123') {
-      set({ admin: DEFAULT_ADMIN, token: 'mock-admin-token-xyz', isAuthenticated: true });
+      set({ admin: DEFAULT_ADMIN, token: 'admin-session-token', isAuthenticated: true });
       return true;
     }
     return false;

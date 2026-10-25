@@ -73,24 +73,6 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {/* Demo hint */}
-          <View style={{
-            backgroundColor: colors.primaryLight,
-            borderRadius: radii.md,
-            padding: spacing.md,
-            borderLeftWidth: 3,
-            borderLeftColor: colors.primary,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <Ionicons name="key-outline" size={20} color={colors.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ ...typography.bodySm, color: colors.primary, fontWeight: '700' }}>Demo Account Credentials</Text>
-              <Text style={{ ...typography.caption, color: colors.primary, marginTop: 2 }}>alex@college.edu • password123</Text>
-            </View>
-          </View>
-
           {/* Form */}
           <View style={{ gap: spacing.md }}>
             <Input

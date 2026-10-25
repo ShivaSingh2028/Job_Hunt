@@ -28,13 +28,6 @@ export function AdminLogin() {
           <p className="text-sm text-slate-400 mt-1">Sign in to moderate the JobHunt platform</p>
         </div>
 
-        {/* Demo credentials hint */}
-        <div className="bg-violet-950/40 border border-violet-800/50 rounded-xl p-3.5 mb-6 text-xs text-violet-300">
-          <p className="font-semibold text-violet-200 mb-0.5">Demo Admin Credentials:</p>
-          <p className="text-slate-400">Email: <span className="text-violet-300 font-mono">admin@jobhunt.campus</span></p>
-          <p className="text-slate-400">Password: <span className="text-violet-300 font-mono">admin123</span></p>
-        </div>
-
         {error && (
           <div className="bg-rose-950/50 border border-rose-800 text-rose-300 text-xs p-3 rounded-lg mb-6">
             {error}

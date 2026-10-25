@@ -92,8 +92,8 @@ export const realAuthService: IAuthService = {
     });
   },
 
-  async sendVerificationOtp(email): Promise<{ message: string; email: string; demoOtp?: string }> {
-    return request<{ message: string; email: string; demoOtp?: string }>('/auth/send-verification-otp', {
+  async sendVerificationOtp(email): Promise<{ message: string; email: string }> {
+    return request<{ message: string; email: string }>('/auth/send-verification-otp', {
       method: 'POST',
       body: JSON.stringify({ email }),
     });

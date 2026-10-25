@@ -88,7 +88,7 @@ export function AdminLayout() {
         <header className="h-16 bg-slate-950/60 border-b border-slate-800 px-8 flex items-center justify-between backdrop-blur">
           <div className="flex items-center gap-3">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-xs font-medium text-slate-400">Environment: <strong className="text-slate-200">Local Campus Demo (Mock Mode)</strong></span>
+            <span className="text-xs font-medium text-slate-400">Environment: <strong className="text-slate-200">Production Campus Network</strong></span>
           </div>
           <div className="flex items-center gap-4">
             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-950/80 border border-violet-600/40 text-violet-300">

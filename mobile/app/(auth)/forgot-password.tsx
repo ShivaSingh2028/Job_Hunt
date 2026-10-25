@@ -90,7 +90,7 @@ export default function ForgotPasswordScreen() {
             }}>
               <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
               <Text style={{ ...typography.bodySm, color: colors.primary, flex: 1 }}>
-                For demonstration purposes, password recovery succeeds automatically for any input.
+                Please check your spam or junk folder if the email does not arrive within a few minutes.
               </Text>
             </View>
             <Button label="Return to Sign In" onPress={() => router.replace('/(auth)/login')} variant="outline" fullWidth />
