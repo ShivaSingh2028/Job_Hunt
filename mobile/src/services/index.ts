@@ -1,4 +1,4 @@
-import { mockAuthService, mockUserService, mockJobService, mockNotificationService, mockReportService, mockChatService } from './mockService';
+import { mockAuthService, mockUserService, mockJobService, mockNotificationService, mockReportService, mockChatService, setMockUser, resetMockUser } from './mockService';
 import { realAuthService, realUserService, realJobService, realNotificationService, realReportService, realChatService, getChatSocket } from './realService';
 import type { IAuthService, IJobService, IUserService, INotificationService, IReportService, IChatService } from './types';
 
@@ -11,4 +11,4 @@ export const jobService: IJobService = USE_MOCK ? mockJobService : realJobServic
 export const notificationService: INotificationService = USE_MOCK ? mockNotificationService : realNotificationService;
 export const reportService: IReportService = USE_MOCK ? mockReportService : realReportService;
 export const chatService: IChatService = USE_MOCK ? mockChatService : realChatService;
-export { getChatSocket };
+export { getChatSocket, setMockUser, resetMockUser };

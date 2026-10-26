@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
@@ -67,17 +67,23 @@ function TabIcon({
 }
 
 export default function AppLayout() {
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { colors } = useTheme();
   const { unreadCount, setUnreadCount } = useJobStore();
   const isSeeker = user?.activeMode === 'SEEKER';
 
   useEffect(() => {
-    notificationService
-      .getNotifications(1)
-      .then((r) => setUnreadCount(r.unreadCount))
-      .catch(() => {});
-  }, []);
+    if (isAuthenticated) {
+      notificationService
+        .getNotifications(1)
+        .then((r) => setUnreadCount(r.unreadCount))
+        .catch(() => {});
+    }
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated || !user) {
+    return <Redirect href="/(auth)/welcome" />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

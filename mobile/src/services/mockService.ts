@@ -13,10 +13,22 @@ let _posts = [...MOCK_POSTS];
 let _notifications = [...MOCK_NOTIFICATIONS];
 let _savedJobIds = [...MOCK_USER.savedJobIds];
 
+export function setMockUser(user: Partial<User>) {
+  _user = { ..._user, ...user };
+  if (user.savedJobIds) {
+    _savedJobIds = [...user.savedJobIds];
+  }
+}
+
+export function resetMockUser() {
+  _user = { ...MOCK_USER };
+  _savedJobIds = [...MOCK_USER.savedJobIds];
+}
+
 export const mockAuthService: IAuthService = {
   async login(email, password) {
     await delay(800);
-    if (email !== 'alex@college.edu') err('NOT_FOUND', 'No account with that email.');
+    if (email !== 'alex@college.edu' && email !== _user.email) err('NOT_FOUND', 'No account with that email.');
     if (password !== 'password123') err('UNAUTHORIZED', 'Incorrect password.');
     return { user: _user, accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' };
   },
@@ -45,7 +57,7 @@ export const mockAuthService: IAuthService = {
       user: _user,
     };
   },
-  async logout(_refreshToken) { await delay(300); },
+  async logout(_refreshToken) { await delay(100); resetMockUser(); },
   async refreshToken(_refreshToken) {
     await delay(200);
     return { accessToken: 'mock-access-token-new', refreshToken: 'mock-refresh-token-new' };

@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { io, Socket } from 'socket.io-client';
+import { useAuthStore } from '../store/authStore';
 import type {
   IAuthService,
   IJobService,
@@ -73,11 +74,16 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isRetry =
         }
       } catch {}
     }
+    // Refresh failed or token is invalid: clear session cleanly
+    useAuthStore.getState().clearAuth();
   }
 
   const json = await res.json().catch(() => null);
 
   if (!res.ok || (json && json.success === false)) {
+    if (res.status === 401 && endpoint !== '/auth/login') {
+      useAuthStore.getState().clearAuth();
+    }
     const errorInfo = json?.error || {
       code: 'UNKNOWN_ERROR',
       message: `Request failed with status ${res.status}`,
