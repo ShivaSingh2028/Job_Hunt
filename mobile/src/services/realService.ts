@@ -9,6 +9,8 @@ import type {
   INotificationService,
   IReportService,
   IChatService,
+  SignupResponse,
+  ResendVerificationResponse,
 } from './types';
 import type {
   User,
@@ -91,6 +93,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isRetry =
     const error = new Error(errorInfo.message) as any;
     error.code = errorInfo.code;
     error.status = res.status;
+    error.attemptsLeft = errorInfo.attemptsLeft;
+    error.retryAfterSeconds = errorInfo.retryAfterSeconds;
     error.pendingItems = errorInfo.pendingItems;
     throw error;
   }
@@ -103,6 +107,27 @@ export const realAuthService: IAuthService = {
     return request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    });
+  },
+
+  async signup(name, email, password, phone): Promise<SignupResponse> {
+    return request<SignupResponse>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, phone }),
+    });
+  },
+
+  async verifyEmail(email, code): Promise<AuthResponse> {
+    return request<AuthResponse>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    });
+  },
+
+  async resendVerification(email): Promise<ResendVerificationResponse> {
+    return request<ResendVerificationResponse>('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
     });
   },
 

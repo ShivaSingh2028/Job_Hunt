@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function LoginScreen() {
   const router = useRouter();
   const { colors, typography, spacing, radii } = useTheme();
-  const { login } = useAuth();
+  const { login, resendVerification } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,10 +41,24 @@ export default function LoginScreen() {
       router.replace('/(app)');
     } catch (err: any) {
       const code = err?.code;
-      if (code === 'UNAUTHORIZED') setErrors({ password: 'Incorrect password' });
-      else if (code === 'NOT_FOUND') setErrors({ email: 'No account with this email' });
-      else if (code === 'USER_BLOCKED') Alert.alert('Account Blocked', err.message);
-      else Alert.alert('Login Failed', err?.message || 'Please try again.');
+      if (code === 'EMAIL_NOT_VERIFIED') {
+        const targetEmail = email.trim().toLowerCase();
+        try {
+          await resendVerification(targetEmail);
+        } catch {}
+        router.push({
+          pathname: '/(auth)/verify-otp',
+          params: { email: targetEmail, next: '/(app)' },
+        } as any);
+      } else if (code === 'UNAUTHORIZED') {
+        setErrors({ password: 'Incorrect password' });
+      } else if (code === 'NOT_FOUND') {
+        setErrors({ email: 'No account with this email' });
+      } else if (code === 'USER_BLOCKED') {
+        Alert.alert('Account Blocked', err.message);
+      } else {
+        Alert.alert('Login Failed', err?.message || 'Please try again.');
+      }
     } finally {
       setLoading(false);
     }

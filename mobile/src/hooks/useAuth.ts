@@ -9,6 +9,20 @@ export function useAuth() {
     setAuth(result.user, { accessToken: result.accessToken, refreshToken: result.refreshToken });
   };
 
+  const signup = async (name: string, email: string, password: string, phone?: string) => {
+    return await authService.signup(name, email, password, phone);
+  };
+
+  const verifyEmail = async (email: string, code: string) => {
+    const result = await authService.verifyEmail(email, code);
+    setAuth(result.user, { accessToken: result.accessToken, refreshToken: result.refreshToken });
+    return result;
+  };
+
+  const resendVerification = async (email: string) => {
+    return await authService.resendVerification(email);
+  };
+
   const register = async (name: string, email: string, password: string, phone?: string) => {
     const result = await authService.register(name, email, password, phone);
     setAuth(result.user, { accessToken: result.accessToken, refreshToken: result.refreshToken });
@@ -47,6 +61,9 @@ export function useAuth() {
     isAuthenticated,
     isLoading,
     login,
+    signup,
+    verifyEmail,
+    resendVerification,
     register,
     logout,
     refreshProfile,

@@ -109,6 +109,17 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     return sendError(res, 'UNAUTHORIZED', 'Incorrect password.', 401);
   }
 
+  // Check email verification status
+  if (!user.isVerified) {
+    return sendError(
+      res,
+      'EMAIL_NOT_VERIFIED',
+      'Please verify your email address before logging in.',
+      403,
+      { email: normalizedEmail }
+    );
+  }
+
   // Check auto-unblock if block expired
   if (user.isBlocked) {
     if (user.blockedUntil && new Date() > user.blockedUntil) {
@@ -181,6 +192,188 @@ authRouter.post('/forgot-password', async (req: Request, res: Response) => {
   return sendSuccess(res, {
     message: `Password reset instructions sent if ${email} is registered.`,
   });
+});
+
+// In-memory OTP rate limiter and attempts tracker
+interface OtpState {
+  attempts: number;
+  lastSentAt: number;
+  lockedUntil?: number;
+}
+const otpStateMap = new Map<string, OtpState>();
+
+// POST /api/v1/auth/signup
+authRouter.post('/signup', async (req: Request, res: Response) => {
+  const { name, email, password, phone } = req.body;
+
+  if (!name || !email || !password) {
+    return sendError(res, 'VALIDATION_ERROR', 'Name, email, and password are required.', 400);
+  }
+
+  const normalized = email.trim().toLowerCase();
+
+  const existing = await prisma.user.findUnique({
+    where: { email: normalized },
+  });
+
+  if (existing) {
+    return sendError(res, 'EMAIL_ALREADY_REGISTERED', 'This email is already registered.', 409);
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  await prisma.user.create({
+    data: {
+      name: name.trim(),
+      email: normalized,
+      passwordHash,
+      phone: phone ? phone.trim() : null,
+      activeMode: 'SEEKER',
+      isVerified: false,
+      verificationOtp: otp,
+      verificationOtpExpiresAt: expiresAt,
+    },
+  });
+
+  otpStateMap.set(normalized, {
+    attempts: 0,
+    lastSentAt: Date.now(),
+  });
+
+  // Dispatch real email via nodemailer SMTP
+  await sendOtpEmail(normalized, otp);
+
+  return sendSuccess(
+    res,
+    {
+      email: normalized,
+      verificationRequired: true,
+      resendAvailableInSeconds: 30,
+    },
+    201
+  );
+});
+
+// POST /api/v1/auth/verify-email
+authRouter.post('/verify-email', async (req: Request, res: Response) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return sendError(res, 'VALIDATION_ERROR', 'Email and 6-digit code are required.', 400);
+  }
+
+  const normalized = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email: normalized },
+  });
+
+  if (!user) {
+    return sendError(res, 'NOT_FOUND', 'User not found.', 404);
+  }
+
+  const state = otpStateMap.get(normalized) || { attempts: 0, lastSentAt: 0 };
+  const now = Date.now();
+
+  // Check if locked due to too many failed attempts
+  if (state.lockedUntil && now < state.lockedUntil) {
+    const retryAfterSeconds = Math.ceil((state.lockedUntil - now) / 1000);
+    return sendError(res, 'TOO_MANY_ATTEMPTS', 'Too many failed attempts. Please try again later.', 429, { retryAfterSeconds });
+  }
+
+  // Check code expiration (10 minutes)
+  if (!user.verificationOtpExpiresAt || now > user.verificationOtpExpiresAt.getTime()) {
+    return sendError(res, 'CODE_EXPIRED', 'Verification code has expired. Please request a new one.', 410);
+  }
+
+  // Check code match
+  if (user.verificationOtp !== code.trim()) {
+    state.attempts += 1;
+    const attemptsLeft = Math.max(0, 5 - state.attempts);
+    if (attemptsLeft === 0) {
+      state.lockedUntil = now + 5 * 60 * 1000; // lock for 5 minutes
+      otpStateMap.set(normalized, state);
+      return sendError(res, 'TOO_MANY_ATTEMPTS', 'Too many failed attempts. Please request a new code.', 429, { retryAfterSeconds: 300 });
+    }
+    otpStateMap.set(normalized, state);
+    return sendError(res, 'INVALID_CODE', `Invalid verification code. ${attemptsLeft} attempt(s) remaining.`, 400, { attemptsLeft });
+  }
+
+  // Code verified!
+  otpStateMap.delete(normalized);
+
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      isVerified: true,
+      verificationOtp: null,
+      verificationOtpExpiresAt: null,
+    },
+  });
+
+  const tokens = generateTokens(updated.id, updated.email, 'USER');
+  const userFormatted = await formatUserResponse(updated.id);
+
+  return sendSuccess(res, {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    user: userFormatted,
+  }, 200);
+});
+
+// POST /api/v1/auth/resend-verification
+authRouter.post('/resend-verification', async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return sendError(res, 'VALIDATION_ERROR', 'Email is required.', 400);
+  }
+
+  const normalized = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email: normalized },
+  });
+
+  if (!user) {
+    return sendError(res, 'NOT_FOUND', 'No account found with this email.', 404);
+  }
+
+  if (user.isVerified) {
+    return sendSuccess(res, { resendAvailableInSeconds: 0 });
+  }
+
+  const state = otpStateMap.get(normalized) || { attempts: 0, lastSentAt: 0 };
+  const now = Date.now();
+  const elapsedSeconds = Math.floor((now - state.lastSentAt) / 1000);
+
+  if (state.lastSentAt > 0 && elapsedSeconds < 30) {
+    const retryAfterSeconds = 30 - elapsedSeconds;
+    return sendError(res, 'RESEND_TOO_SOON', `Please wait ${retryAfterSeconds}s before requesting a new code.`, 429, { retryAfterSeconds });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(now + 10 * 60 * 1000); // 10 minutes
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      verificationOtp: otp,
+      verificationOtpExpiresAt: expiresAt,
+    },
+  });
+
+  otpStateMap.set(normalized, {
+    attempts: 0,
+    lastSentAt: now,
+    lockedUntil: undefined,
+  });
+
+  await sendOtpEmail(normalized, otp);
+
+  return sendSuccess(res, {
+    resendAvailableInSeconds: 30,
+  }, 200);
 });
 
 // POST /api/v1/auth/send-verification-otp

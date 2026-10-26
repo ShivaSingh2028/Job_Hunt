@@ -1,4 +1,4 @@
-import type { IAuthService, IJobService, IUserService, INotificationService, IReportService, IChatService } from './types';
+import type { IAuthService, IJobService, IUserService, INotificationService, IReportService, IChatService, SignupResponse, ResendVerificationResponse } from './types';
 import type { User, Job, Application, JobPost, Notification, AuthResponse, CreateJobPayload, JobFilters, ReportPayload, Conversation, ChatMessage } from '../types';
 import { MOCK_USER, MOCK_JOBS, MOCK_APPLICATIONS, MOCK_POSTS, MOCK_NOTIFICATIONS } from './mockData';
 import { subDays } from 'date-fns';
@@ -30,7 +30,48 @@ export const mockAuthService: IAuthService = {
     await delay(800);
     if (email !== 'alex@college.edu' && email !== _user.email) err('NOT_FOUND', 'No account with that email.');
     if (password !== 'password123') err('UNAUTHORIZED', 'Incorrect password.');
+    if (!_user.isVerified && email === _user.email) {
+      err('EMAIL_NOT_VERIFIED', 'Please verify your email address before logging in.');
+    }
     return { user: _user, accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' };
+  },
+  async signup(name, email, _password, phone): Promise<SignupResponse> {
+    await delay(600);
+    if (email === 'alex@college.edu') err('EMAIL_ALREADY_REGISTERED', 'This email is already registered.');
+    _user = {
+      ..._user,
+      id: `user_${Date.now()}`,
+      name,
+      email,
+      phone: phone || null,
+      isVerified: false,
+    };
+    return {
+      email,
+      verificationRequired: true,
+      resendAvailableInSeconds: 30,
+    };
+  },
+  async verifyEmail(email, code) {
+    await delay(600);
+    if (!code || code.length !== 6) {
+      const error: any = new Error('Invalid verification code. Please enter 6 digits.');
+      error.code = 'INVALID_CODE';
+      error.attemptsLeft = 4;
+      throw error;
+    }
+    if (code === '000000') {
+      const error: any = new Error('Invalid verification code.');
+      error.code = 'INVALID_CODE';
+      error.attemptsLeft = 4;
+      throw error;
+    }
+    _user = { ..._user, isVerified: true };
+    return { user: _user, accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' };
+  },
+  async resendVerification(_email): Promise<ResendVerificationResponse> {
+    await delay(400);
+    return { resendAvailableInSeconds: 30 };
   },
   async register(name, email, _password, phone) {
     await delay(1000);

@@ -13,15 +13,17 @@ export function sendError(
   code: string,
   message: string,
   statusCode = 400,
-  pendingItems?: any[]
+  extra?: Record<string, any> | any[]
 ) {
+  const errorObj: Record<string, any> = { code, message };
+  if (Array.isArray(extra)) {
+    errorObj.pendingItems = extra;
+  } else if (extra && typeof extra === 'object') {
+    Object.assign(errorObj, extra);
+  }
   return res.status(statusCode).json({
     success: false,
     data: null,
-    error: {
-      code,
-      message,
-      ...(pendingItems ? { pendingItems } : {}),
-    },
+    error: errorObj,
   });
 }

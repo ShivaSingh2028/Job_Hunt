@@ -19,31 +19,35 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { Button } from '../../src/components/ui/Button';
 import { useAuth } from '../../src/hooks/useAuth';
 
+function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return email;
+  const [local, domain] = email.split('@');
+  if (local.length <= 1) {
+    return `${local}***@${domain}`;
+  }
+  const first = local[0];
+  const last = local.length > 2 ? local[local.length - 1] : '';
+  return `${first}***${last}@${domain}`;
+}
+
 export default function VerifyOtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string; next?: string }>();
   const { colors, typography, spacing, radii } = useTheme();
-  const { user, sendVerificationOtp, verifyEmailOtp } = useAuth();
+  const { user, verifyEmail, resendVerification } = useAuth();
 
-  const targetEmail = params.email || user?.email || '';
+  const targetEmail = (params.email || user?.email || '').trim().toLowerCase();
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [cooldown, setCooldown] = useState(60);
+  const [cooldown, setCooldown] = useState(30);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
-  const hasSentRef = useRef(false);
 
-  // Send OTP on mount if user just arrived
-  useEffect(() => {
-    if (targetEmail && !hasSentRef.current) {
-      hasSentRef.current = true;
-      handleSendOtp(false);
-    }
-  }, [targetEmail]);
-
-  // Cooldown timer
+  // Cooldown timer (decrements each second)
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setInterval(() => {
@@ -52,21 +56,31 @@ export default function VerifyOtpScreen() {
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  const handleSendOtp = async (isManualResend = true) => {
-    if (!targetEmail) return;
-    if (isManualResend) setResending(true);
+  const handleResendOtp = async () => {
+    if (!targetEmail || cooldown > 0 || resending || isLocked) return;
+    setResending(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
     try {
-      await sendVerificationOtp(targetEmail);
+      const res = await resendVerification(targetEmail);
       setStatusMessage('Verification code sent! Check your inbox.');
-      setCooldown(60);
+      setCooldown(res?.resendAvailableInSeconds || 30);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Could not send verification code.');
+      if (err?.code === 'RESEND_TOO_SOON') {
+        const retryAfter = err.retryAfterSeconds || 30;
+        setCooldown(retryAfter);
+        setErrorMessage(`Please wait ${retryAfter}s before requesting a new code.`);
+      } else {
+        setErrorMessage(err?.message || 'Could not send verification code.');
+      }
     } finally {
-      if (isManualResend) setResending(false);
+      setResending(false);
     }
   };
 
   const handleDigitChange = (index: number, value: string) => {
+    setErrorMessage(null);
+
     // Handle paste of full 6-digit code
     if (value.length > 1) {
       const cleaned = value.replace(/[^0-9]/g, '').slice(0, 6);
@@ -112,15 +126,20 @@ export default function VerifyOtpScreen() {
 
   const triggerVerification = async (otpCode: string) => {
     if (otpCode.length !== 6) {
-      Alert.alert('Incomplete Code', 'Please enter all 6 digits.');
+      setErrorMessage('Please enter all 6 digits.');
       return;
     }
+    if (isLocked) return;
+
     setLoading(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
     try {
-      await verifyEmailOtp(targetEmail, otpCode);
+      await verifyEmail(targetEmail, otpCode);
       Alert.alert(
         'Verified! 🎉',
-        'Your student identity has been verified successfully.',
+        'Your email has been verified successfully.',
         [
           {
             text: 'Continue',
@@ -135,7 +154,24 @@ export default function VerifyOtpScreen() {
         ]
       );
     } catch (err: any) {
-      Alert.alert('Verification Failed', err?.message || 'Invalid or expired OTP. Please try again.');
+      const code = err?.code;
+      if (code === 'INVALID_CODE') {
+        const left = err.attemptsLeft;
+        if (typeof left === 'number') {
+          setErrorMessage(`Invalid code. ${left} attempt${left === 1 ? '' : 's'} remaining.`);
+        } else {
+          setErrorMessage(err?.message || 'Invalid verification code.');
+        }
+      } else if (code === 'CODE_EXPIRED') {
+        setErrorMessage('Verification code has expired. Please request a new code.');
+      } else if (code === 'TOO_MANY_ATTEMPTS') {
+        setIsLocked(true);
+        const retrySec = err.retryAfterSeconds || 300;
+        setCooldown(retrySec);
+        setErrorMessage(`Too many failed attempts. Please wait ${Math.ceil(retrySec / 60)} minute(s) before trying again.`);
+      } else {
+        setErrorMessage(err?.message || 'Verification failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -181,45 +217,57 @@ export default function VerifyOtpScreen() {
               <Text style={{ ...typography.bodyLg, color: colors.textSecondary, marginTop: 4 }}>
                 We sent a 6-digit confirmation code to:
               </Text>
-              <Text style={{ ...typography.headingSm, color: colors.primary }}>{targetEmail || 'your email'}</Text>
+              <Text style={{ ...typography.headingSm, color: colors.primary }}>
+                {maskEmail(targetEmail) || 'your email'}
+              </Text>
             </View>
 
             {/* 6 Digit Input Boxes */}
             <View style={{ gap: spacing.sm, marginVertical: spacing.md }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                {digits.map((digit, index) => {
-                  const isFocused = inputRefs.current[index]?.isFocused?.();
-                  return (
-                    <TextInput
-                      key={index}
-                      ref={ref => { inputRefs.current[index] = ref; }}
-                      style={{
-                        flex: 1,
-                        height: 56,
-                        borderWidth: 2,
-                        borderColor: digit ? colors.primary : colors.border,
-                        borderRadius: radii.md,
-                        backgroundColor: colors.bgSecondary,
-                        textAlign: 'center',
-                        fontSize: 24,
-                        fontWeight: '700',
-                        color: colors.text,
-                      }}
-                      value={digit}
-                      onChangeText={val => handleDigitChange(index, val)}
-                      onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
-                      keyboardType="number-pad"
-                      maxLength={1}
-                      selectTextOnFocus
-                    />
-                  );
-                })}
+                {digits.map((digit, index) => (
+                  <TextInput
+                    key={index}
+                    ref={ref => { inputRefs.current[index] = ref; }}
+                    style={{
+                      flex: 1,
+                      height: 56,
+                      borderWidth: 2,
+                      borderColor: errorMessage ? colors.error : digit ? colors.primary : colors.border,
+                      borderRadius: radii.md,
+                      backgroundColor: colors.bgSecondary,
+                      textAlign: 'center',
+                      fontSize: 24,
+                      fontWeight: '700',
+                      color: colors.text,
+                    }}
+                    value={digit}
+                    onChangeText={val => handleDigitChange(index, val)}
+                    onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    selectTextOnFocus
+                    editable={!loading && !isLocked}
+                  />
+                ))}
               </View>
 
+              {errorMessage && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
+                  <Ionicons name="alert-circle" size={16} color={colors.error} />
+                  <Text style={{ ...typography.caption, color: colors.error, textAlign: 'center' }}>
+                    {errorMessage}
+                  </Text>
+                </View>
+              )}
+
               {statusMessage && (
-                <Text style={{ ...typography.caption, color: colors.success, textAlign: 'center', marginTop: 4 }}>
-                  {statusMessage}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                  <Text style={{ ...typography.caption, color: colors.success, textAlign: 'center' }}>
+                    {statusMessage}
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -228,7 +276,7 @@ export default function VerifyOtpScreen() {
               label={loading ? 'Verifying...' : 'Verify & Continue'}
               onPress={() => triggerVerification(fullOtp)}
               loading={loading}
-              disabled={fullOtp.length !== 6 || loading}
+              disabled={fullOtp.length !== 6 || loading || isLocked}
               fullWidth
               size="lg"
             />
@@ -241,7 +289,7 @@ export default function VerifyOtpScreen() {
                   Resend in {cooldown}s
                 </Text>
               ) : (
-                <TouchableOpacity onPress={() => handleSendOtp(true)} disabled={resending}>
+                <TouchableOpacity onPress={handleResendOtp} disabled={resending || isLocked}>
                   {resending ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (

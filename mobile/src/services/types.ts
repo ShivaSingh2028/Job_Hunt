@@ -1,8 +1,21 @@
 import type { Job, User, Application, JobPost, Notification, AuthResponse, CreateJobPayload, JobFilters, ReportPayload, Conversation, ChatMessage } from '../types';
 
+export interface SignupResponse {
+  email: string;
+  verificationRequired: boolean;
+  resendAvailableInSeconds: number;
+}
+
+export interface ResendVerificationResponse {
+  resendAvailableInSeconds: number;
+}
+
 export interface IAuthService {
   login(email: string, password: string): Promise<AuthResponse>;
   register(name: string, email: string, password: string, phone?: string): Promise<AuthResponse>;
+  signup(name: string, email: string, password: string, phone?: string): Promise<SignupResponse>;
+  verifyEmail(email: string, code: string): Promise<AuthResponse>;
+  resendVerification(email: string): Promise<ResendVerificationResponse>;
   forgotPassword(email: string): Promise<void>;
   sendVerificationOtp(email: string): Promise<{ message: string; email: string }>;
   verifyEmailOtp(email: string, otp: string): Promise<{ message: string; user: User }>;

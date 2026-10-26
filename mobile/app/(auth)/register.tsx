@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function RegisterScreen() {
   const router = useRouter();
   const { colors, typography, spacing } = useTheme();
-  const { register } = useAuth();
+  const { signup } = useAuth();
 
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', phone: '' });
   const [showPw, setShowPw] = useState(false);
@@ -39,14 +39,19 @@ export default function RegisterScreen() {
     if (!validate()) return;
     setLoading(true);
     try {
-      await register(form.name.trim(), form.email.trim().toLowerCase(), form.password, form.phone || undefined);
+      await signup(form.name.trim(), form.email.trim().toLowerCase(), form.password, form.phone || undefined);
       router.replace({
         pathname: '/(auth)/verify-otp',
-        params: { email: form.email.trim().toLowerCase(), next: '/(auth)/location-permission' },
+        params: { email: form.email.trim().toLowerCase(), next: '/(app)' },
       } as any);
     } catch (err: any) {
-      if (err?.code === 'CONFLICT') setErrors({ email: 'Email already registered' });
-      else Alert.alert('Registration Failed', err?.message || 'Please try again.');
+      if (err?.code === 'EMAIL_ALREADY_REGISTERED' || err?.code === 'CONFLICT') {
+        setErrors({ email: 'This email is already registered' });
+      } else if (err?.code === 'VALIDATION_ERROR') {
+        Alert.alert('Validation Error', err?.message || 'Please check your inputs.');
+      } else {
+        Alert.alert('Registration Failed', err?.message || 'Please try again.');
+      }
     } finally {
       setLoading(false);
     }

@@ -48,8 +48,8 @@ or on failure:
 
 ## 1. Auth
 
-### POST `/auth/register`
-Create a new account (no role choice at signup).
+### POST `/auth/signup`
+Sign up with email verification required before login.
 
 **Request:**
 ```json
@@ -64,24 +64,89 @@ Create a new account (no role choice at signup).
 **Response `201`:**
 ```json
 {
-  "user": {
-    "id": "uuid",
-    "name": "string",
-    "email": "string",
-    "phone": "string | null",
-    "avatarUrl": "string | null",
-    "activeMode": "SEEKER",
-    "cancellationCount": 0,
-    "isBlocked": false,
-    "blockedUntil": null,
-    "createdAt": "ISO8601"
-  },
+  "email": "string",
+  "verificationRequired": true,
+  "resendAvailableInSeconds": 30
+}
+```
+*(No tokens returned; user must verify email with the 6-digit OTP code before a session is issued).*
+
+**Errors:**
+- `400 VALIDATION_ERROR`
+- `409 EMAIL_ALREADY_REGISTERED`
+
+---
+
+### POST `/auth/verify-email`
+Verify the 6-digit email OTP code and receive session tokens.
+
+**Request:**
+```json
+{
+  "email": "string",
+  "code": "string (6 digits)"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "user": { ... },
   "accessToken": "string",
   "refreshToken": "string"
 }
 ```
 
-**Errors:** `VALIDATION_ERROR`, `CONFLICT` (email already registered)
+**Errors:**
+- `400 INVALID_CODE`: Invalid code with `{ "attemptsLeft": number }`
+- `410 CODE_EXPIRED`: Code has expired (> 10 mins)
+- `429 TOO_MANY_ATTEMPTS`: 5 wrong attempts with `{ "retryAfterSeconds": number }`
+
+---
+
+### POST `/auth/resend-verification`
+Resend a fresh 6-digit verification code to user's email.
+
+**Request:**
+```json
+{
+  "email": "string"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "resendAvailableInSeconds": 30
+}
+```
+
+**Errors:**
+- `429 RESEND_TOO_SOON`: Rate limited (< 30s) with `{ "retryAfterSeconds": number }`
+
+---
+
+### POST `/auth/register`
+Legacy/direct register endpoint (creates account and returns tokens).
+
+**Request:**
+```json
+{
+  "name": "string",
+  "email": "string",
+  "password": "string",
+  "phone": "string (optional)"
+}
+```
+
+**Response `201`:**
+```json
+{
+  "user": { ... },
+  "accessToken": "string",
+  "refreshToken": "string"
+}
+```
 
 ---
 
@@ -91,7 +156,12 @@ Create a new account (no role choice at signup).
 ```
 **Response `200`:** Same shape as register response.
 
-**Errors:** `VALIDATION_ERROR`, `NOT_FOUND` (user not found), `UNAUTHORIZED` (wrong password), `USER_BLOCKED`
+**Errors:**
+- `400 VALIDATION_ERROR`
+- `404 NOT_FOUND` (user not found)
+- `401 UNAUTHORIZED` (wrong password)
+- `403 EMAIL_NOT_VERIFIED` (email not yet verified; app must navigate to OTP screen and resend code)
+- `403 USER_BLOCKED`
 
 ---
 
