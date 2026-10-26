@@ -49,11 +49,12 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchJobs();
-  }, [filters, coords]);
+  }, [filters]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchJobs(true);
+    await refreshLocation();
+    await fetchJobs(true);
   };
 
   if (!isSeeker) {

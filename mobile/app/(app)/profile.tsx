@@ -109,7 +109,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Text style={{ ...typography.headingSm, fontWeight: '700', color: colors.text }}>
-                  {user?.isVerified ? 'College ID Verified' : 'ID Not Verified'}
+                  {user?.isVerified ? 'Email Verified' : 'Email Not Verified'}
                 </Text>
                 {user?.isVerified && (
                   <Ionicons name="checkmark-circle" size={16} color={colors.success} />
@@ -117,8 +117,8 @@ export default function ProfileScreen() {
               </View>
               <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }}>
                 {user?.isVerified
-                  ? 'Authenticated student account. Full access unlocked.'
-                  : 'Verify with college email OTP to post and accept jobs.'}
+                  ? 'Verified account. Full access unlocked.'
+                  : 'Verify your email with an OTP to post and accept jobs.'}
               </Text>
             </View>
           </View>

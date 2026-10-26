@@ -76,8 +76,8 @@ export default function LoginScreen() {
           {/* Form */}
           <View style={{ gap: spacing.md }}>
             <Input
-              label="College email"
-              placeholder="you@college.edu"
+              label="Email"
+              placeholder="you@example.com"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"

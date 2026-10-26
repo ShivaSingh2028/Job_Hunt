@@ -47,12 +47,12 @@ export default function ForgotPasswordScreen() {
             <View style={{ gap: spacing.xs }}>
               <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>Reset Password</Text>
               <Text style={{ ...typography.bodyLg, color: colors.textSecondary }}>
-                Enter your college email and we will dispatch a reset link.
+                Enter your email address and we will dispatch a reset link.
               </Text>
             </View>
             <Input
-              label="College email"
-              placeholder="you@college.edu"
+              label="Email"
+              placeholder="you@example.com"
               value={email}
               onChangeText={v => { setEmail(v); setError(''); }}
               keyboardType="email-address"

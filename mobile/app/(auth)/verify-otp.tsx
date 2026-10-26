@@ -177,7 +177,7 @@ export default function VerifyOtpScreen() {
               }}>
                 <Ionicons name="shield-checkmark" size={30} color={colors.primary} />
               </View>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>Verify Your College ID</Text>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>Verify Your Email</Text>
               <Text style={{ ...typography.bodyLg, color: colors.textSecondary, marginTop: 4 }}>
                 We sent a 6-digit confirmation code to:
               </Text>

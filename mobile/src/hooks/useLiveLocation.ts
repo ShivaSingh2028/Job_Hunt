@@ -12,43 +12,53 @@ export interface LiveLocationState {
   refreshLocation: () => Promise<void>;
 }
 
+// In-memory cache to prevent repeated hardware GPS queries across component mounts
+let _cachedCoords: { lat: number; lng: number } | null = null;
+let _cachedLabel: string | null = null;
+
 export function useLiveLocation(): LiveLocationState {
-  const { user, setUser } = useAuthStore();
+  const { user } = useAuthStore();
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    user?.location ? { lat: user.location.lat, lng: user.location.lng } : null
+    _cachedCoords || (user?.location ? { lat: user.location.lat, lng: user.location.lng } : null)
   );
   const [locationName, setLocationName] = useState<string>(
-    user?.location?.label || 'Detecting live location...'
+    _cachedLabel || user?.location?.label || 'Detecting live location...'
   );
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const watchSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const isFetchingRef = useRef(false);
 
   const fetchCurrentLocation = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setIsLocating(true);
     setErrorMsg(null);
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setPermissionGranted(false);
-        setErrorMsg('Location permission denied. Using campus default.');
+        setErrorMsg('Location permission denied. Using default campus location.');
         setIsLocating(false);
+        isFetchingRef.current = false;
         return;
       }
       setPermissionGranted(true);
 
-      // Get high-accuracy current live location
+      // Fast, balanced accuracy that avoids aggressive GPS hardware drain
       const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
 
       const newLat = loc.coords.latitude;
       const newLng = loc.coords.longitude;
+
+      _cachedCoords = { lat: newLat, lng: newLng };
       setCoords({ lat: newLat, lng: newLng });
 
-      // Reverse geocode to get real-time address/neighborhood
-      let addressLabel = 'Current Location';
+      // Reverse geocode to get human-friendly neighborhood/city name
+      let addressLabel = _cachedLabel || 'Current Location';
       try {
         const geo = await Location.reverseGeocodeAsync({
           latitude: newLat,
@@ -64,59 +74,30 @@ export function useLiveLocation(): LiveLocationState {
           addressLabel = parts.slice(0, 2).join(', ') || place.city || 'Campus Area';
         }
       } catch {
-        // Fallback to coordinates or existing label
+        // Fallback gracefully
       }
 
+      _cachedLabel = addressLabel;
       setLocationName(addressLabel);
 
-      // Persist to user store and service
-      if (user) {
-        setUser({
-          ...user,
-          location: { lat: newLat, lng: newLng, label: addressLabel },
-        });
-      }
-      await userService.updateLocation(newLat, newLng, addressLabel);
+      // Persist to backend without blocking UI thread
+      userService.updateLocation(newLat, newLng, addressLabel).catch(() => {});
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to fetch GPS coordinates');
     } finally {
       setIsLocating(false);
+      isFetchingRef.current = false;
     }
-  }, [user]);
-
-  // Start watching location on mount
-  useEffect(() => {
-    fetchCurrentLocation();
-
-    // Subscribe to live position updates if permissions allow
-    (async () => {
-      try {
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const sub = await Location.watchPositionAsync(
-            {
-              accuracy: Location.Accuracy.Balanced,
-              timeInterval: 10000,
-              distanceInterval: 25, // update every 25 meters
-            },
-            async (pos) => {
-              const liveLat = pos.coords.latitude;
-              const liveLng = pos.coords.longitude;
-              setCoords({ lat: liveLat, lng: liveLng });
-            }
-          );
-          watchSubscriptionRef.current = sub;
-        }
-      } catch {}
-    })();
-
-    return () => {
-      if (watchSubscriptionRef.current) {
-        watchSubscriptionRef.current.remove();
-        watchSubscriptionRef.current = null;
-      }
-    };
   }, []);
+
+  useEffect(() => {
+    // If not yet cached, fetch once on mount
+    if (!_cachedCoords) {
+      fetchCurrentLocation();
+    } else {
+      setPermissionGranted(true);
+    }
+  }, [fetchCurrentLocation]);
 
   return {
     coords,

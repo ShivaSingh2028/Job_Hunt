@@ -75,7 +75,7 @@ export default function RegisterScreen() {
 
           <View style={{ gap: spacing.md }}>
             <Input label="Full name" placeholder="Alex Johnson" value={form.name} onChangeText={set('name')} error={errors.name} autoComplete="name" />
-            <Input label="College email" placeholder="you@college.edu" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" error={errors.email} />
+            <Input label="Email" placeholder="you@example.com" value={form.email} onChangeText={set('email')} keyboardType="email-address" autoCapitalize="none" error={errors.email} />
             <Input label="Phone (optional)" placeholder="+91 98765 43210" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" />
             <Input
               label="Password"

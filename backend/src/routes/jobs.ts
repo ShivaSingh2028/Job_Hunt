@@ -276,7 +276,7 @@ jobsRouter.post('/', authenticateToken, async (req: AuthRequest, res: Response) 
     return sendError(
       res,
       'USER_NOT_VERIFIED',
-      'Please verify your college email address with the 6-digit OTP code before posting gigs.',
+      'Please verify your email address with the 6-digit OTP code before posting gigs.',
       403
     );
   }
@@ -366,7 +366,7 @@ jobsRouter.post('/:id/accept', authenticateToken, async (req: AuthRequest, res: 
     return sendError(
       res,
       'USER_NOT_VERIFIED',
-      'Please verify your college email address with the 6-digit OTP code before accepting gigs.',
+      'Please verify your email address with the 6-digit OTP code before accepting gigs.',
       403
     );
   }

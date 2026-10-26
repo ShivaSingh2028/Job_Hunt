@@ -59,8 +59,8 @@ export default function JobDetailScreen() {
     if (!job) return;
     if (user && !user.isVerified) {
       Alert.alert(
-        'Student Verification Required',
-        'Please verify your college email identity before accepting campus gigs.',
+        'Email Verification Required',
+        'Please verify your email address before accepting gigs.',
         [
           { text: 'Later', style: 'cancel' },
           { text: 'Verify Now', onPress: () => router.push('/(auth)/verify-otp' as any) },

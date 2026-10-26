@@ -27,16 +27,19 @@ export interface AuthRequest extends Request {
 }
 
 export function generateTokens(userId: string, email: string, role = 'USER') {
+  const accessExpiry = (process.env.ACCESS_TOKEN_EXPIRY || '30d') as any;
+  const refreshExpiry = (process.env.REFRESH_TOKEN_EXPIRY || '180d') as any;
+
   const accessToken = jwt.sign(
     { userId, email, role, type: 'access' },
     JWT_SECRET,
-    { expiresIn: '1h' }
+    { expiresIn: accessExpiry }
   );
 
   const refreshToken = jwt.sign(
     { userId, email, role, type: 'refresh' },
     JWT_REFRESH_SECRET,
-    { expiresIn: '30d' }
+    { expiresIn: refreshExpiry }
   );
 
   return { accessToken, refreshToken };

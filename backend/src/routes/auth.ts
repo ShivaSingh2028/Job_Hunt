@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma.js';
 import { generateTokens, verifyRefreshToken } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { sendOtpEmail } from '../utils/mailer.js';
 
 export const authRouter = Router();
 
@@ -187,7 +188,7 @@ authRouter.post('/send-verification-otp', async (req: Request, res: Response) =>
   const { email } = req.body;
 
   if (!email) {
-    return sendError(res, 'VALIDATION_ERROR', 'College email is required', 400);
+    return sendError(res, 'VALIDATION_ERROR', 'Email is required', 400);
   }
 
   const normalized = email.trim().toLowerCase();
@@ -211,17 +212,16 @@ authRouter.post('/send-verification-otp', async (req: Request, res: Response) =>
     },
   });
 
-  console.log(`\n========================================`);
-  console.log(`[CAMPUS SECURITY] 📧 COLLEGE VERIFICATION OTP`);
-  console.log(`Recipient: ${normalized}`);
-  console.log(`6-Digit OTP: ${otp}`);
-  console.log(`Expires: ${expiresAt.toISOString()}`);
-  console.log(`========================================\n`);
+  // Dispatch real email via nodemailer SMTP
+  const mailResult = await sendOtpEmail(normalized, otp);
 
   return sendSuccess(res, {
-    message: `Verification code sent to ${normalized}. Please check your inbox.`,
+    message: mailResult.sent
+      ? `Verification code sent to ${normalized}. Please check your inbox.`
+      : `Verification code generated for ${normalized}.`,
     email: normalized,
     expiresAt: expiresAt.toISOString(),
+    delivered: mailResult.sent,
   });
 });
 
@@ -261,7 +261,7 @@ authRouter.post('/verify-email-otp', async (req: Request, res: Response) => {
   const formatted = await formatUserResponse(updated.id);
 
   return sendSuccess(res, {
-    message: 'College email successfully verified! You can now accept and post gigs.',
+    message: 'Email successfully verified! You can now accept and post gigs.',
     user: formatted,
   });
 });
