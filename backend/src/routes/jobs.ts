@@ -60,7 +60,7 @@ export async function formatJob(
     type: job.type,
     title: job.title,
     description: job.description,
-    pay: job.pay,
+    pay: Number(job.pay),
     payUnit: job.payUnit,
     openings: job.openings,
     filledCount: job.filledCount,

@@ -74,6 +74,7 @@ Sign up with email verification required before login.
 **Errors:**
 - `400 VALIDATION_ERROR`
 - `409 EMAIL_ALREADY_REGISTERED`
+- `503 EMAIL_SEND_FAILED`: Email delivery failed (e.g. SMTP issue) with message `"We couldn't send the email. Try again."`
 
 ---
 
@@ -123,6 +124,7 @@ Resend a fresh 6-digit verification code to user's email.
 
 **Errors:**
 - `429 RESEND_TOO_SOON`: Rate limited (< 30s) with `{ "retryAfterSeconds": number }`
+- `503 EMAIL_SEND_FAILED`: Email delivery failed (e.g. SMTP issue) with message `"We couldn't send the email. Try again."`
 
 ---
 

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { sendError } from '../utils/response.js';
 import { prisma } from '../prisma.js';
 
@@ -27,8 +28,8 @@ export interface AuthRequest extends Request {
 }
 
 export function generateTokens(userId: string, email: string, role = 'USER') {
-  const accessExpiry = (process.env.ACCESS_TOKEN_EXPIRY || '30d') as any;
-  const refreshExpiry = (process.env.REFRESH_TOKEN_EXPIRY || '180d') as any;
+  const accessExpiry = (process.env.ACCESS_TOKEN_EXPIRY || '15m') as any;
+  const refreshExpiry = (process.env.REFRESH_TOKEN_EXPIRY || '30d') as any;
 
   const accessToken = jwt.sign(
     { userId, email, role, type: 'access' },
@@ -37,12 +38,40 @@ export function generateTokens(userId: string, email: string, role = 'USER') {
   );
 
   const refreshToken = jwt.sign(
-    { userId, email, role, type: 'refresh' },
+    { userId, email, role, type: 'refresh', jti: crypto.randomUUID() },
     JWT_REFRESH_SECRET,
     { expiresIn: refreshExpiry }
   );
 
   return { accessToken, refreshToken };
+}
+
+export async function saveRefreshToken(userId: string, token: string, daysValid = 30) {
+  const expiresAt = new Date(Date.now() + daysValid * 24 * 60 * 60 * 1000);
+  return await prisma.refreshToken.create({
+    data: {
+      userId,
+      token,
+      expiresAt,
+    },
+  });
+}
+
+export async function rotateRefreshToken(oldToken: string, userId: string, email: string, role = 'USER') {
+  // Delete old refresh token
+  await prisma.refreshToken.deleteMany({ where: { token: oldToken } });
+
+  // Generate new token pair
+  const newTokens = generateTokens(userId, email, role);
+
+  // Save new refresh token to persistent database
+  await saveRefreshToken(userId, newTokens.refreshToken);
+
+  return newTokens;
+}
+
+export async function revokeRefreshToken(token: string) {
+  await prisma.refreshToken.deleteMany({ where: { token } });
 }
 
 export function verifyRefreshToken(token: string): TokenPayload | null {

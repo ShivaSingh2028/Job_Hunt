@@ -34,7 +34,47 @@ const DEFAULT_URL =
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_URL;
 
+let wakingCount = 0;
+function trackServerActivity(): () => void {
+  let hasSetWaking = false;
+  const timer = setTimeout(() => {
+    hasSetWaking = true;
+    wakingCount++;
+    useAuthStore.getState().setServerWaking(true);
+  }, 2500);
+
+  return () => {
+    clearTimeout(timer);
+    if (hasSetWaking) {
+      wakingCount = Math.max(0, wakingCount - 1);
+      if (wakingCount === 0) {
+        useAuthStore.getState().setServerWaking(false);
+      }
+    }
+  };
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 45000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
+  const stopActivityTracking = trackServerActivity();
+  try {
+    return await executeRequest<T>(endpoint, options, isRetry);
+  } finally {
+    stopActivityTracking();
+  }
+}
+
+async function executeRequest<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const token = await SecureStore.getItemAsync('accessToken').catch(() => null);
 
   const headers: Record<string, string> = {
@@ -47,12 +87,29 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isRetry =
   }
 
   const url = `${BASE_URL}${endpoint}`;
-  let res: Response;
-  try {
-    res = await fetch(url, { ...options, headers });
-  } catch (netErr: any) {
-    const e = new Error('Network request failed. Is the JobHunt backend running?') as any;
+  let res: Response | null = null;
+  let lastNetworkError: any = null;
+
+  // Retry up to 2 times with >= 45s timeout for cold-start server wakeups
+  const maxAttempts = 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      res = await fetchWithTimeout(url, { ...options, headers }, 45000);
+      break;
+    } catch (netErr: any) {
+      lastNetworkError = netErr;
+      if (attempt < maxAttempts) {
+        useAuthStore.getState().setServerWaking(true);
+        // Wait 3s before retry while Render cold starts
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+  }
+
+  if (!res) {
+    const e = new Error("Can't reach the server. The server may be waking up, please wait a moment and try again.") as any;
     e.code = 'NETWORK_ERROR';
+    e.cause = lastNetworkError;
     throw e;
   }
 
@@ -61,36 +118,55 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isRetry =
     const refreshToken = await SecureStore.getItemAsync('refreshToken').catch(() => null);
     if (refreshToken) {
       try {
-        const refreshRes = await fetch(`${BASE_URL}/auth/refresh`, {
+        const refreshRes = await fetchWithTimeout(`${BASE_URL}/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
-        });
-        const refreshData = await refreshRes.json().catch(() => null);
-        if (refreshRes.ok && refreshData?.data?.accessToken) {
-          await SecureStore.setItemAsync('accessToken', refreshData.data.accessToken);
-          if (refreshData.data.refreshToken) {
-            await SecureStore.setItemAsync('refreshToken', refreshData.data.refreshToken);
+        }, 45000);
+
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json().catch(() => null);
+          if (refreshData?.data?.accessToken) {
+            await SecureStore.setItemAsync('accessToken', refreshData.data.accessToken);
+            if (refreshData.data.refreshToken) {
+              await SecureStore.setItemAsync('refreshToken', refreshData.data.refreshToken);
+            }
+            return request<T>(endpoint, options, true);
           }
-          return request<T>(endpoint, options, true);
+        } else if (refreshRes.status === 401) {
+          // ONLY clear session when the server answers 401 to a refresh attempt
+          useAuthStore.getState().clearAuth();
         }
-      } catch {}
+      } catch (refreshErr) {
+        // Network error / timeout during refresh: DO NOT wipe session!
+        const e = new Error("Can't reach the server to refresh session. Please retry.") as any;
+        e.code = 'NETWORK_ERROR';
+        throw e;
+      }
+    } else {
+      useAuthStore.getState().clearAuth();
     }
-    // Refresh failed or token is invalid: clear session cleanly
-    useAuthStore.getState().clearAuth();
   }
 
   const json = await res.json().catch(() => null);
 
   if (!res.ok || (json && json.success === false)) {
-    if (res.status === 401 && endpoint !== '/auth/login') {
+    // ONLY clear auth if this is a confirmed retry with an invalid token (401)
+    if (res.status === 401 && isRetry && endpoint !== '/auth/login') {
       useAuthStore.getState().clearAuth();
     }
+
     const errorInfo = json?.error || {
-      code: 'UNKNOWN_ERROR',
+      code: res.status === 404 ? 'NOT_FOUND' : 'UNKNOWN_ERROR',
       message: `Request failed with status ${res.status}`,
     };
-    const error = new Error(errorInfo.message) as any;
+
+    let userFacingMessage = errorInfo.message;
+    if (errorInfo.code === 'EMAIL_SEND_FAILED') {
+      userFacingMessage = "We couldn't send the email. Try again.";
+    }
+
+    const error = new Error(userFacingMessage) as any;
     error.code = errorInfo.code;
     error.status = res.status;
     error.attemptsLeft = errorInfo.attemptsLeft;

@@ -1,11 +1,42 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma.js';
-import { generateTokens, verifyRefreshToken } from '../middleware/auth.js';
+import {
+  generateTokens,
+  verifyRefreshToken,
+  saveRefreshToken,
+  rotateRefreshToken,
+  revokeRefreshToken,
+} from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { sendOtpEmail } from '../utils/mailer.js';
 
 export const authRouter = Router();
+
+// Migration helper to ensure all existing user emails are trimmed & lowercased
+export async function normalizeExistingUserEmails() {
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, email: true },
+    });
+    let count = 0;
+    for (const u of users) {
+      const norm = u.email.trim().toLowerCase();
+      if (norm !== u.email) {
+        await prisma.user.update({
+          where: { id: u.id },
+          data: { email: norm },
+        });
+        count++;
+      }
+    }
+    if (count > 0) {
+      console.log(`[DB MIGRATION] Normalized ${count} user email(s) to lowercase.`);
+    }
+  } catch (err) {
+    console.error('[DB MIGRATION] Email normalization error:', err);
+  }
+}
 
 // Helper to format user response
 export async function formatUserResponse(userId: string) {
@@ -73,6 +104,7 @@ authRouter.post('/register', async (req: Request, res: Response) => {
   });
 
   const tokens = generateTokens(newUser.id, newUser.email, 'USER');
+  await saveRefreshToken(newUser.id, tokens.refreshToken);
   const userFormatted = await formatUserResponse(newUser.id);
 
   return sendSuccess(
@@ -142,6 +174,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   }
 
   const tokens = generateTokens(user.id, user.email, 'USER');
+  await saveRefreshToken(user.id, tokens.refreshToken);
   const userFormatted = await formatUserResponse(user.id);
 
   return sendSuccess(res, {
@@ -161,7 +194,19 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
 
   const payload = verifyRefreshToken(refreshToken);
   if (!payload) {
-    return sendError(res, 'UNAUTHORIZED', 'Invalid or expired refresh token.', 401);
+    return sendError(res, 'UNAUTHORIZED', 'Invalid or expired refresh token signature.', 401);
+  }
+
+  // Check database persistence: token must exist and not be expired
+  const stored = await prisma.refreshToken.findUnique({
+    where: { token: refreshToken },
+  });
+
+  if (!stored || new Date() > stored.expiresAt) {
+    if (stored) {
+      await revokeRefreshToken(refreshToken);
+    }
+    return sendError(res, 'UNAUTHORIZED', 'Refresh token expired or revoked.', 401);
   }
 
   const user = await prisma.user.findUnique({
@@ -169,10 +214,12 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
   });
 
   if (!user) {
+    await revokeRefreshToken(refreshToken);
     return sendError(res, 'NOT_FOUND', 'User not found.', 404);
   }
 
-  const newTokens = generateTokens(user.id, user.email, payload.role || 'USER');
+  // Rotate refresh token safely in database
+  const newTokens = await rotateRefreshToken(refreshToken, user.id, user.email, payload.role || 'USER');
 
   return sendSuccess(res, {
     accessToken: newTokens.accessToken,
@@ -182,6 +229,10 @@ authRouter.post('/refresh', async (req: Request, res: Response) => {
 
 // POST /api/v1/auth/logout
 authRouter.post('/logout', async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    await revokeRefreshToken(refreshToken);
+  }
   return sendSuccess(res, { message: 'Logged out successfully' });
 });
 
@@ -222,6 +273,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHashed = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   await prisma.user.create({
@@ -232,7 +284,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
       phone: phone ? phone.trim() : null,
       activeMode: 'SEEKER',
       isVerified: false,
-      verificationOtp: otp,
+      verificationOtp: otpHashed,
       verificationOtpExpiresAt: expiresAt,
     },
   });
@@ -243,7 +295,16 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
   });
 
   // Dispatch real email via nodemailer SMTP
-  await sendOtpEmail(normalized, otp);
+  const mailResult = await sendOtpEmail(normalized, otp);
+  if (!mailResult.sent) {
+    console.error(`[AUTH SIGNUP] Email delivery failed for ${normalized}:`, mailResult.error || mailResult.reason);
+    return sendError(
+      res,
+      'EMAIL_SEND_FAILED',
+      mailResult.error || "We couldn't send the email. Try again.",
+      503
+    );
+  }
 
   return sendSuccess(
     res,
@@ -287,8 +348,14 @@ authRouter.post('/verify-email', async (req: Request, res: Response) => {
     return sendError(res, 'CODE_EXPIRED', 'Verification code has expired. Please request a new one.', 410);
   }
 
-  // Check code match
-  if (user.verificationOtp !== code.trim()) {
+  // Check code match using secure hash comparison
+  const isOtpValid = user.verificationOtp
+    ? (user.verificationOtp.startsWith('$2')
+        ? await bcrypt.compare(code.trim(), user.verificationOtp)
+        : user.verificationOtp === code.trim()) // backward-compatible with legacy unhashed OTP
+    : false;
+
+  if (!isOtpValid) {
     state.attempts += 1;
     const attemptsLeft = Math.max(0, 5 - state.attempts);
     if (attemptsLeft === 0) {
@@ -313,6 +380,7 @@ authRouter.post('/verify-email', async (req: Request, res: Response) => {
   });
 
   const tokens = generateTokens(updated.id, updated.email, 'USER');
+  await saveRefreshToken(updated.id, tokens.refreshToken);
   const userFormatted = await formatUserResponse(updated.id);
 
   return sendSuccess(res, {
@@ -353,12 +421,13 @@ authRouter.post('/resend-verification', async (req: Request, res: Response) => {
   }
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHashed = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(now + 10 * 60 * 1000); // 10 minutes
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      verificationOtp: otp,
+      verificationOtp: otpHashed,
       verificationOtpExpiresAt: expiresAt,
     },
   });
@@ -369,7 +438,16 @@ authRouter.post('/resend-verification', async (req: Request, res: Response) => {
     lockedUntil: undefined,
   });
 
-  await sendOtpEmail(normalized, otp);
+  const mailResult = await sendOtpEmail(normalized, otp);
+  if (!mailResult.sent) {
+    console.error(`[AUTH RESEND] Email delivery failed for ${normalized}:`, mailResult.error || mailResult.reason);
+    return sendError(
+      res,
+      'EMAIL_SEND_FAILED',
+      mailResult.error || "We couldn't send the email. Try again.",
+      503
+    );
+  }
 
   return sendSuccess(res, {
     resendAvailableInSeconds: 30,
@@ -395,26 +473,34 @@ authRouter.post('/send-verification-otp', async (req: Request, res: Response) =>
 
   // Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpHashed = await bcrypt.hash(otp, 10);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   await prisma.user.update({
     where: { id: user.id },
     data: {
-      verificationOtp: otp,
+      verificationOtp: otpHashed,
       verificationOtpExpiresAt: expiresAt,
     },
   });
 
-  // Dispatch real email via nodemailer SMTP
+  // Dispatch real email via nodemailer SMTP or HTTPS provider
   const mailResult = await sendOtpEmail(normalized, otp);
+  if (!mailResult.sent) {
+    console.error(`[AUTH SEND-OTP] Email delivery failed for ${normalized}:`, mailResult.error || mailResult.reason);
+    return sendError(
+      res,
+      'EMAIL_SEND_FAILED',
+      mailResult.error || "We couldn't send the email. Try again.",
+      503
+    );
+  }
 
   return sendSuccess(res, {
-    message: mailResult.sent
-      ? `Verification code sent to ${normalized}. Please check your inbox.`
-      : `Verification code generated for ${normalized}.`,
+    message: `Verification code sent to ${normalized}. Please check your inbox.`,
     email: normalized,
     expiresAt: expiresAt.toISOString(),
-    delivered: mailResult.sent,
+    delivered: true,
   });
 });
 
@@ -435,7 +521,11 @@ authRouter.post('/verify-email-otp', async (req: Request, res: Response) => {
     return sendError(res, 'NOT_FOUND', 'User not found', 404);
   }
 
-  const isMatch = user.verificationOtp === otp.trim();
+  const isMatch = user.verificationOtp
+    ? (user.verificationOtp.startsWith('$2')
+        ? await bcrypt.compare(otp.trim(), user.verificationOtp)
+        : user.verificationOtp === otp.trim())
+    : false;
   const isNotExpired = user.verificationOtpExpiresAt && new Date() <= user.verificationOtpExpiresAt;
 
   if (!isMatch || !isNotExpired) {

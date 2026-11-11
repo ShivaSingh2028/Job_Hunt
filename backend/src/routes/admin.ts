@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import { ActionLogType } from '@prisma/client';
 import { prisma } from '../prisma.js';
 import {
   authenticateToken,
@@ -15,7 +16,7 @@ export const adminRouter = Router();
 async function logAdminAction(
   adminId: string,
   adminName: string,
-  action: string,
+  action: ActionLogType,
   targetType: string,
   targetId: string | null,
   note: string | null
@@ -216,7 +217,7 @@ adminRouter.get('/users/:id', async (req: Request, res: Response) => {
     title: j.title,
     description: j.description,
     type: j.type,
-    pay: j.pay,
+    pay: Number(j.pay),
     payUnit: j.payUnit,
     openings: j.openings,
     filledCount: j.filledCount,
@@ -355,7 +356,7 @@ adminRouter.get('/jobs', async (req: Request, res: Response) => {
     title: j.title,
     description: j.description,
     type: j.type,
-    pay: j.pay,
+    pay: Number(j.pay),
     payUnit: j.payUnit,
     openings: j.openings,
     filledCount: j.filledCount,

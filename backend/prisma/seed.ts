@@ -6,24 +6,15 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding JobHunt database...');
 
-  // Clear existing data
-  await prisma.actionLog.deleteMany();
-  await prisma.report.deleteMany();
-  await prisma.message.deleteMany();
-  await prisma.conversation.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.savedJob.deleteMany();
-  await prisma.application.deleteMany();
-  await prisma.job.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.adminUser.deleteMany();
-
+  // NOTE: Never delete real users or real database records during seeding!
   const hashedUserPw = await bcrypt.hash('password123', 10);
   const hashedAdminPw = await bcrypt.hash('admin123', 10);
 
-  // 1. Create Admin
-  const admin = await prisma.adminUser.create({
-    data: {
+  // 1. Create or ensure Admin
+  const admin = await prisma.adminUser.upsert({
+    where: { email: 'admin@jobhunt.campus' },
+    update: {},
+    create: {
       id: 'admin-1',
       email: 'admin@jobhunt.campus',
       passwordHash: hashedAdminPw,
@@ -32,9 +23,11 @@ async function main() {
     },
   });
 
-  // 2. Create Users
-  const alex = await prisma.user.create({
-    data: {
+  // 2. Upsert Demo Users
+  const alex = await prisma.user.upsert({
+    where: { email: 'alex@college.edu' },
+    update: {},
+    create: {
       id: 'user-1',
       name: 'Alex Johnson',
       email: 'alex@college.edu',
@@ -50,8 +43,10 @@ async function main() {
     },
   });
 
-  const priya = await prisma.user.create({
-    data: {
+  const priya = await prisma.user.upsert({
+    where: { email: 'priya@college.edu' },
+    update: {},
+    create: {
       id: 'user-2',
       name: 'Priya Sharma',
       email: 'priya@college.edu',
@@ -65,8 +60,10 @@ async function main() {
     },
   });
 
-  const rohan = await prisma.user.create({
-    data: {
+  const rohan = await prisma.user.upsert({
+    where: { email: 'rohan@college.edu' },
+    update: {},
+    create: {
       id: 'user-3',
       name: 'Rohan Verma',
       email: 'rohan@college.edu',
@@ -80,8 +77,10 @@ async function main() {
     },
   });
 
-  const sneha = await prisma.user.create({
-    data: {
+  const sneha = await prisma.user.upsert({
+    where: { email: 'sneha@college.edu' },
+    update: {},
+    create: {
       id: 'user-4',
       name: 'Sneha Patel',
       email: 'sneha@college.edu',
@@ -95,8 +94,10 @@ async function main() {
     },
   });
 
-  const drMehta = await prisma.user.create({
-    data: {
+  const drMehta = await prisma.user.upsert({
+    where: { email: 'mehta@college.edu' },
+    update: {},
+    create: {
       id: 'user-5',
       name: 'Dr. Mehta',
       email: 'mehta@college.edu',
@@ -110,8 +111,10 @@ async function main() {
     },
   });
 
-  const studentCouncil = await prisma.user.create({
-    data: {
+  const studentCouncil = await prisma.user.upsert({
+    where: { email: 'council@college.edu' },
+    update: {},
+    create: {
       id: 'user-6',
       name: 'Student Council',
       email: 'council@college.edu',
@@ -134,7 +137,13 @@ async function main() {
     return fmt(d);
   };
 
-  // 3. Create Jobs
+  // 3. Create Demo Jobs only if not already seeded
+  const existingJob = await prisma.job.findUnique({ where: { id: 'job-1' } });
+  if (existingJob) {
+    console.log('Demo jobs already seeded, skipping job creation.');
+    return;
+  }
+
   const job1 = await prisma.job.create({
     data: {
       id: 'job-1',

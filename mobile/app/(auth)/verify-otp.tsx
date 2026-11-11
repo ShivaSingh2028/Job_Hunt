@@ -32,7 +32,7 @@ function maskEmail(email: string): string {
 
 export default function VerifyOtpScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string; next?: string }>();
+  const params = useLocalSearchParams<{ email?: string; next?: string; autoSent?: string }>();
   const { colors, typography, spacing, radii } = useTheme();
   const { user, verifyEmail, resendVerification } = useAuth();
 
@@ -46,6 +46,7 @@ export default function VerifyOtpScreen() {
   const [isLocked, setIsLocked] = useState(false);
 
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const hasTriggeredInitialSend = useRef(false);
 
   // Cooldown timer (decrements each second)
   useEffect(() => {
@@ -56,8 +57,18 @@ export default function VerifyOtpScreen() {
     return () => clearInterval(timer);
   }, [cooldown]);
 
+  // If opened directly without autoSent flag, request OTP once immediately on mount
+  useEffect(() => {
+    if (!hasTriggeredInitialSend.current && targetEmail) {
+      hasTriggeredInitialSend.current = true;
+      if (params.autoSent !== 'true') {
+        handleResendOtp();
+      }
+    }
+  }, [targetEmail]);
+
   const handleResendOtp = async () => {
-    if (!targetEmail || cooldown > 0 || resending || isLocked) return;
+    if (!targetEmail || resending || isLocked) return;
     setResending(true);
     setErrorMessage(null);
     setStatusMessage(null);
@@ -70,8 +81,10 @@ export default function VerifyOtpScreen() {
         const retryAfter = err.retryAfterSeconds || 30;
         setCooldown(retryAfter);
         setErrorMessage(`Please wait ${retryAfter}s before requesting a new code.`);
+      } else if (err?.code === 'EMAIL_SEND_FAILED') {
+        setErrorMessage("We couldn't send the email. Try again.");
       } else {
-        setErrorMessage(err?.message || 'Could not send verification code.');
+        setErrorMessage(err?.message || "We couldn't send the email. Try again.");
       }
     } finally {
       setResending(false);

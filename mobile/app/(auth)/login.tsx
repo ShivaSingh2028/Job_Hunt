@@ -53,9 +53,11 @@ export default function LoginScreen() {
       } else if (code === 'UNAUTHORIZED') {
         setErrors({ password: 'Incorrect password' });
       } else if (code === 'NOT_FOUND') {
-        setErrors({ email: 'No account with this email' });
+        setErrors({ email: 'No account found for this email' });
       } else if (code === 'USER_BLOCKED') {
         Alert.alert('Account Blocked', err.message);
+      } else if (code === 'NETWORK_ERROR') {
+        Alert.alert("Can't reach the server", "Please check your internet connection or wait a moment while the server wakes up, then try again.");
       } else {
         Alert.alert('Login Failed', err?.message || 'Please try again.');
       }

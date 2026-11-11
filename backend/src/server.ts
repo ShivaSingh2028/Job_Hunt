@@ -6,7 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 
-import { authRouter } from './routes/auth.js';
+import { authRouter, normalizeExistingUserEmails } from './routes/auth.js';
 import { usersRouter } from './routes/users.js';
 import { jobsRouter } from './routes/jobs.js';
 import { notificationsRouter } from './routes/notifications.js';
@@ -14,6 +14,7 @@ import { reportsRouter } from './routes/reports.js';
 import { adminRouter } from './routes/admin.js';
 import { chatRouter } from './routes/chat.js';
 import { sendSuccess, sendError } from './utils/response.js';
+import { verifySmtpConnection } from './utils/mailer.js';
 
 dotenv.config();
 
@@ -136,8 +137,14 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // Start listening on 0.0.0.0
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 JobHunt Backend REST & Real-Time API running at http://0.0.0.0:${PORT}/api/v1`);
   console.log(`📡 Local Network: http://10.162.68.159:${PORT}/api/v1`);
   console.log(`💻 Local Machine: http://localhost:${PORT}/api/v1`);
+
+  // Normalize existing database user emails to lowercase on startup
+  await normalizeExistingUserEmails();
+
+  // Verify SMTP Connection for OTP delivery
+  await verifySmtpConnection();
 });

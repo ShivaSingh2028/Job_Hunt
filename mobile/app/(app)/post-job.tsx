@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, Switch,
 } from 'react-native';
@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuthStore } from '../../src/store/authStore';
-import { jobService } from '../../src/services';
+import { jobService, userService, authService } from '../../src/services';
 import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
 import type { JobType, PayUnit } from '../../src/types';
@@ -32,6 +32,41 @@ export default function PostJobScreen() {
   const [endTime, setEndTime] = useState('13:00');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Refresh user verification status from server on mount
+  useEffect(() => {
+    if (process.env.EXPO_PUBLIC_USE_MOCK !== 'true') {
+      userService.getMe().then((fresh) => {
+        if (fresh) useAuthStore.getState().setUser(fresh);
+      }).catch(() => {});
+    }
+  }, []);
+
+  const openVerificationGate = (emailToVerify: string) => {
+    Alert.alert(
+      'Email Verification Required',
+      'Please verify your email address before posting gigs. We will send a 6-digit confirmation code.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Verify Now',
+          onPress: async () => {
+            try {
+              if (emailToVerify) {
+                await authService.resendVerification(emailToVerify);
+              }
+            } catch (err: any) {
+              console.log('[POST-JOB] Resend verification triggered:', err?.message);
+            }
+            router.push({
+              pathname: '/(auth)/verify-otp',
+              params: { email: emailToVerify, next: '/(app)/post-job', autoSent: 'true' },
+            } as any);
+          },
+        },
+      ]
+    );
+  };
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -61,17 +96,23 @@ export default function PostJobScreen() {
   };
 
   const handlePost = async () => {
-    if (user && !user.isVerified) {
-      Alert.alert(
-        'Email Verification Required',
-        'Please verify your email address before posting gigs.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Verify Now', onPress: () => router.push('/(auth)/verify-otp' as any) },
-        ]
-      );
+    // Check server value of user as single source of truth
+    let currentUser = user;
+    if (process.env.EXPO_PUBLIC_USE_MOCK !== 'true') {
+      try {
+        const fresh = await userService.getMe();
+        if (fresh) {
+          useAuthStore.getState().setUser(fresh);
+          currentUser = fresh;
+        }
+      } catch {}
+    }
+
+    if (currentUser && !currentUser.isVerified) {
+      openVerificationGate(currentUser.email);
       return;
     }
+
     if (!validate()) return;
     setLoading(true);
     try {
@@ -84,8 +125,8 @@ export default function PostJobScreen() {
         openings: Number(openings),
         isRemote: type === 'SHORT_TERM' ? false : isRemote,
         location: isRemote ? undefined : {
-          lat: user?.location?.lat ?? 28.6145,
-          lng: user?.location?.lng ?? 77.2085,
+          lat: currentUser?.location?.lat ?? 28.6145,
+          lng: currentUser?.location?.lng ?? 77.2085,
           label: locationLabel.trim(),
         },
         startDate,
@@ -100,7 +141,11 @@ export default function PostJobScreen() {
         [{ text: 'View My Posts', onPress: () => router.replace('/(app)/my-jobs') }]
       );
     } catch (e: any) {
-      Alert.alert('Post Failed', e?.message || 'Could not post gig.');
+      if (e?.code === 'USER_NOT_VERIFIED') {
+        openVerificationGate(currentUser?.email || user?.email || '');
+      } else {
+        Alert.alert('Post Failed', e?.message || 'Could not post gig.');
+      }
     } finally {
       setLoading(false);
     }
