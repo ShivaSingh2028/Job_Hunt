@@ -1,4 +1,4 @@
-import { Router, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../prisma.js';
 import {
   authenticateToken,
@@ -7,8 +7,9 @@ import {
 } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { calculateDistanceKm } from '../utils/distance.js';
+import { createAsyncRouter } from '../utils/asyncHandler.js';
 
-export const jobsRouter = Router();
+export const jobsRouter = createAsyncRouter();
 
 // Helper to format a job for response
 export async function formatJob(

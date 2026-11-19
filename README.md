@@ -181,6 +181,14 @@ Cloud providers such as Render, AWS EC2, and DigitalOcean frequently block outbo
 - **Hashed OTPs**: OTP codes are salted and hashed with `bcrypt` (10 rounds) before being saved. Plaintext OTPs are never stored in the database.
 - **Strict Delivery Verification**: If email delivery fails, the backend returns HTTP `503 EMAIL_SEND_FAILED` with the underlying reason. It never falsely claims an email was dispatched when it was not.
 - **DEV-ONLY Console Log**: When running in development (`NODE_ENV !== 'production'`), if email delivery fails, the OTP is printed to the backend terminal clearly labeled `[DEV ONLY]` to accelerate local testing. In production, this output is strictly disabled.
+- **Brevo Verified Sender Requirement**: When using `EMAIL_PROVIDER=brevo`, `EMAIL_FROM` (or `BREVO_SENDER`) must match an active verified sender under **Brevo > Senders, Domains & Dedicated IPs > Senders**; otherwise Brevo accepts the API call (`201`) and rejects delivery asynchronously in **Transactional > Logs**.
+
+#### DEV-ONLY Manual Verification Helper (If Email Delivery Is Delayed):
+To manually mark a test user as verified in development without waiting for email delivery (strictly refuses to run if `NODE_ENV=production`):
+```bash
+cd backend
+npm run dev:verify-user -- testuser@gmail.com
+```
 
 ---
 

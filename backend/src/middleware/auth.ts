@@ -134,6 +134,9 @@ export async function authenticateToken(
 
     next();
   } catch (err: any) {
+    if (err?.name?.startsWith('Prisma')) {
+      return next(err);
+    }
     return sendError(res, 'UNAUTHORIZED', 'Invalid or expired token.', 401);
   }
 }

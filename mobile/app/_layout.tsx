@@ -1,34 +1,55 @@
-import { useEffect } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, TextInput, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { useAuthStore } from '../src/store/authStore';
 import { loadSession } from '../src/services/session';
 import { userService } from '../src/services';
+
+// Ensure default typography is Inter across all unstyled Text and TextInput
+if ((Text as any).defaultProps == null) {
+  (Text as any).defaultProps = {};
+}
+(Text as any).defaultProps.style = {
+  fontFamily: 'Inter_400Regular',
+};
+
+if ((TextInput as any).defaultProps == null) {
+  (TextInput as any).defaultProps = {};
+}
+(TextInput as any).defaultProps.style = {
+  fontFamily: 'Inter_400Regular',
+};
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const { setAuth, clearAuth } = useAuthStore();
   const isServerWaking = useAuthStore((s) => s.isServerWaking);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
   useEffect(() => {
     let isMounted = true;
 
-    // Safety timeout: ensure splash screen hides in <= 2 seconds under all circumstances
-    const safetyTimer = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-      if (useAuthStore.getState().isLoading) {
-        useAuthStore.getState().setLoading(false);
-      }
-    }, 2000);
-
     (async () => {
       try {
-        // Pure local storage check (SecureStore + AsyncStorage) - NO network or mock delay!
         const session = await loadSession();
         if (!isMounted) return;
 
@@ -40,11 +61,8 @@ export default function RootLayout() {
       } catch {
         if (isMounted) clearAuth();
       } finally {
-        clearTimeout(safetyTimer);
-        await SplashScreen.hideAsync().catch(() => {});
+        if (isMounted) setSessionLoaded(true);
 
-        // Non-blocking background session revalidation for real API mode
-        // MUST NEVER block splash or initial screen presentation
         if (process.env.EXPO_PUBLIC_USE_MOCK !== 'true') {
           const currentUser = useAuthStore.getState().user;
           if (currentUser) {
@@ -56,7 +74,6 @@ export default function RootLayout() {
                 }
               })
               .catch((err: any) => {
-                // Do NOT log the user out on timeouts or 5xx errors! Only explicit 401
                 if (err?.status === 401 || err?.code === 'UNAUTHORIZED') {
                   useAuthStore.getState().clearAuth();
                 }
@@ -68,9 +85,28 @@ export default function RootLayout() {
 
     return () => {
       isMounted = false;
-      clearTimeout(safetyTimer);
     };
   }, []);
+
+  useEffect(() => {
+    // Hide splash once fonts and session are resolved
+    if ((fontsLoaded || fontError) && sessionLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+      if (useAuthStore.getState().isLoading) {
+        useAuthStore.getState().setLoading(false);
+      }
+    }
+
+    // Safety timeout: splash screen will never freeze longer than 2 seconds
+    const safetyTimer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+      if (useAuthStore.getState().isLoading) {
+        useAuthStore.getState().setLoading(false);
+      }
+    }, 2000);
+
+    return () => clearTimeout(safetyTimer);
+  }, [fontsLoaded, fontError, sessionLoaded]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -109,6 +145,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(app)" />
+          <Stack.Screen name="design-preview" />
         </Stack>
         <StatusBar style="auto" />
       </SafeAreaProvider>

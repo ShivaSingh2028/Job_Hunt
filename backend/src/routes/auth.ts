@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma.js';
 import {
@@ -10,8 +10,9 @@ import {
 } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { sendOtpEmail } from '../utils/mailer.js';
+import { createAsyncRouter } from '../utils/asyncHandler.js';
 
-export const authRouter = Router();
+export const authRouter = createAsyncRouter();
 
 // Migration helper to ensure all existing user emails are trimmed & lowercased
 export async function normalizeExistingUserEmails() {

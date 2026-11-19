@@ -9,26 +9,42 @@ interface Props {
 }
 
 export function BlockedBanner({ blockedUntil }: Props) {
-  const { colors, spacing, typography } = useTheme();
+  const { colors, spacing, typography, radii } = useTheme();
   if (!blockedUntil) return null;
+
   return (
     <View
       style={{
-        backgroundColor: colors.error,
+        backgroundColor: colors.dangerBg,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.danger,
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.lg,
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.md,
       }}
+      accessibilityRole="alert"
+      accessibilityLabel="Account suspension warning"
     >
-      <Ionicons name="lock-closed" size={20} color="#fff" />
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: radii.full,
+          backgroundColor: colors.danger,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name="lock-closed" size={18} color="#FFFFFF" />
+      </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ ...typography.headingSm, color: '#fff', fontWeight: '700' }}>
-          Account Temporarily Suspended
+        <Text style={{ ...typography.heading, fontSize: 14, color: colors.dangerText, fontWeight: '700' }}>
+          Account Restricted for 24 Hours
         </Text>
-        <Text style={{ ...typography.bodySm, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>
-          Temporary restriction due to 3 cancellations. Unlocks in {blockTimeRemaining(blockedUntil)}.
+        <Text style={{ ...typography.caption, color: colors.dangerText, marginTop: 2, lineHeight: 16 }}>
+          Action locked due to repeated cancellations. Access automatically restores in {blockTimeRemaining(blockedUntil)}.
         </Text>
       </View>
     </View>

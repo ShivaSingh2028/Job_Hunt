@@ -5,18 +5,14 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Button } from '../../src/components/ui/Button';
+import { KeyboardScreen } from '../../src/components/ui/KeyboardScreen';
+import { Banner } from '../../src/components/ui/Banner';
 import { useAuth } from '../../src/hooks/useAuth';
 
 function maskEmail(email: string): string {
@@ -45,19 +41,17 @@ export default function VerifyOtpScreen() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLocked, setIsLocked] = useState(false);
 
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const inputRefs = useRef<(React.ComponentRef<typeof TextInput> | null)[]>([]);
   const hasTriggeredInitialSend = useRef(false);
 
-  // Cooldown timer (decrements each second)
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setInterval(() => {
-      setCooldown(c => Math.max(0, c - 1));
+      setCooldown((c) => Math.max(0, c - 1));
     }, 1000);
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  // If opened directly without autoSent flag, request OTP once immediately on mount
   useEffect(() => {
     if (!hasTriggeredInitialSend.current && targetEmail) {
       hasTriggeredInitialSend.current = true;
@@ -74,7 +68,7 @@ export default function VerifyOtpScreen() {
     setStatusMessage(null);
     try {
       const res = await resendVerification(targetEmail);
-      setStatusMessage('Verification code sent! Check your inbox.');
+      setStatusMessage('Verification code sent! Please check your inbox.');
       setCooldown(res?.resendAvailableInSeconds || 30);
     } catch (err: any) {
       if (err?.code === 'RESEND_TOO_SOON') {
@@ -82,9 +76,9 @@ export default function VerifyOtpScreen() {
         setCooldown(retryAfter);
         setErrorMessage(`Please wait ${retryAfter}s before requesting a new code.`);
       } else if (err?.code === 'EMAIL_SEND_FAILED') {
-        setErrorMessage("We couldn't send the email. Try again.");
+        setErrorMessage("We couldn't deliver the email right now. Please try again.");
       } else {
-        setErrorMessage(err?.message || "We couldn't send the email. Try again.");
+        setErrorMessage(err?.message || "We couldn't send the code. Please try again.");
       }
     } finally {
       setResending(false);
@@ -116,13 +110,11 @@ export default function VerifyOtpScreen() {
     nextDigits[index] = value.replace(/[^0-9]/g, '');
     setDigits(nextDigits);
 
-    // Auto advance to next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto submit if all 6 filled
-    const allFilled = nextDigits.every(d => d.length === 1);
+    const allFilled = nextDigits.every((d) => d.length === 1);
     if (allFilled) {
       triggerVerification(nextDigits.join(''));
     }
@@ -151,8 +143,8 @@ export default function VerifyOtpScreen() {
     try {
       await verifyEmail(targetEmail, otpCode);
       Alert.alert(
-        'Verified! 🎉',
-        'Your email has been verified successfully.',
+        'Verified Successfully',
+        'Your email has been verified. Welcome to JobHunt!',
         [
           {
             text: 'Continue',
@@ -181,7 +173,9 @@ export default function VerifyOtpScreen() {
         setIsLocked(true);
         const retrySec = err.retryAfterSeconds || 300;
         setCooldown(retrySec);
-        setErrorMessage(`Too many failed attempts. Please wait ${Math.ceil(retrySec / 60)} minute(s) before trying again.`);
+        setErrorMessage(
+          `Too many failed attempts. Please wait ${Math.ceil(retrySec / 60)} minute(s) before trying again.`
+        );
       } else {
         setErrorMessage(err?.message || 'Verification failed. Please try again.');
       }
@@ -193,143 +187,203 @@ export default function VerifyOtpScreen() {
   const fullOtp = digits.join('');
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <StatusBar style="auto" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <KeyboardScreen>
+      {/* Top back navigation */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          alignSelf: 'flex-start',
+          marginBottom: spacing.lg,
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1, padding: spacing.xl, justifyContent: 'space-between' }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={{ gap: spacing.xl }}>
-            {/* Top Bar */}
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}
-            >
-              <Ionicons name="arrow-back" size={20} color={colors.primary} />
-              <Text style={{ ...typography.bodyLg, color: colors.primary, fontWeight: '600' }}>Back</Text>
-            </TouchableOpacity>
+        <Ionicons name="arrow-back" size={20} color={colors.text} />
+        <Text style={{ ...typography.secondary, color: colors.text, fontWeight: '600' }}>
+          Back
+        </Text>
+      </TouchableOpacity>
 
-            {/* Header */}
-            <View style={{ gap: spacing.xs }}>
-              <View style={{
-                width: 56,
-                height: 56,
-                borderRadius: 28,
-                backgroundColor: `${colors.primary}15`,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: spacing.xs,
-              }}>
-                <Ionicons name="shield-checkmark" size={30} color={colors.primary} />
-              </View>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>Verify Your Email</Text>
-              <Text style={{ ...typography.bodyLg, color: colors.textSecondary, marginTop: 4 }}>
-                We sent a 6-digit confirmation code to:
-              </Text>
-              <Text style={{ ...typography.headingSm, color: colors.primary }}>
-                {maskEmail(targetEmail) || 'your email'}
-              </Text>
-            </View>
+      <View style={{ gap: spacing.xl }}>
+        {/* Header Section */}
+        <View style={{ gap: spacing.xs }}>
+          <View
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: radii.full,
+              backgroundColor: colors.primaryBg,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: spacing.xs,
+              borderWidth: 1,
+              borderColor: colors.primaryLight,
+            }}
+          >
+            <Ionicons name="shield-checkmark-outline" size={28} color={colors.primary} />
+          </View>
+          <Text
+            style={{
+              ...typography.title,
+              fontSize: 26,
+              lineHeight: 34,
+              color: colors.text,
+              fontWeight: '700',
+            }}
+          >
+            Verify your email
+          </Text>
+          <Text
+            style={{
+              ...typography.secondary,
+              color: colors.textSecondary,
+              lineHeight: 20,
+              marginTop: 2,
+            }}
+          >
+            We sent a 6-digit confirmation code to:
+          </Text>
+          <Text
+            style={{
+              ...typography.heading,
+              fontSize: 16,
+              color: colors.primary,
+              fontWeight: '600',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {maskEmail(targetEmail) || 'your email'}
+          </Text>
+        </View>
 
-            {/* 6 Digit Input Boxes */}
-            <View style={{ gap: spacing.sm, marginVertical: spacing.md }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                {digits.map((digit, index) => (
-                  <TextInput
-                    key={index}
-                    ref={ref => { inputRefs.current[index] = ref; }}
-                    style={{
-                      flex: 1,
-                      height: 56,
-                      borderWidth: 2,
-                      borderColor: errorMessage ? colors.error : digit ? colors.primary : colors.border,
-                      borderRadius: radii.md,
-                      backgroundColor: colors.bgSecondary,
-                      textAlign: 'center',
-                      fontSize: 24,
-                      fontWeight: '700',
-                      color: colors.text,
-                    }}
-                    value={digit}
-                    onChangeText={val => handleDigitChange(index, val)}
-                    onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
-                    keyboardType="number-pad"
-                    maxLength={1}
-                    selectTextOnFocus
-                    editable={!loading && !isLocked}
-                  />
-                ))}
-              </View>
+        {/* 6 Digit Input Boxes */}
+        <View style={{ gap: spacing.md }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+            {digits.map((digit, index) => {
+              const hasDigit = digit.length === 1;
+              return (
+                <TextInput
+                  key={index}
+                  ref={(ref) => {
+                    inputRefs.current[index] = ref;
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 56,
+                    borderWidth: hasDigit ? 2 : 1.5,
+                    borderColor: errorMessage
+                      ? colors.danger
+                      : hasDigit
+                      ? colors.primary
+                      : colors.border,
+                    borderRadius: radii.input,
+                    backgroundColor: colors.surface,
+                    textAlign: 'center',
+                    fontSize: 22,
+                    fontWeight: '700',
+                    fontVariant: ['tabular-nums'],
+                    color: colors.text,
+                  }}
+                  value={digit}
+                  onChangeText={(val) => handleDigitChange(index, val)}
+                  onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  selectTextOnFocus
+                  editable={!loading && !isLocked}
+                />
+              );
+            })}
+          </View>
 
-              {errorMessage && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
-                  <Ionicons name="alert-circle" size={16} color={colors.error} />
-                  <Text style={{ ...typography.caption, color: colors.error, textAlign: 'center' }}>
-                    {errorMessage}
-                  </Text>
-                </View>
-              )}
-
-              {statusMessage && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 }}>
-                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                  <Text style={{ ...typography.caption, color: colors.success, textAlign: 'center' }}>
-                    {statusMessage}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Verify CTA */}
-            <Button
-              label={loading ? 'Verifying...' : 'Verify & Continue'}
-              onPress={() => triggerVerification(fullOtp)}
-              loading={loading}
-              disabled={fullOtp.length !== 6 || loading || isLocked}
-              fullWidth
-              size="lg"
+          {/* Feedback Banners */}
+          {errorMessage && (
+            <Banner
+              variant="danger"
+              message={errorMessage}
             />
+          )}
 
-            {/* Resend OTP */}
-            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-              <Text style={{ ...typography.bodyMd, color: colors.textSecondary }}>Didn't get the code?</Text>
-              {cooldown > 0 ? (
-                <Text style={{ ...typography.bodyMd, color: colors.textMuted, fontWeight: '600' }}>
-                  Resend in {cooldown}s
-                </Text>
-              ) : (
-                <TouchableOpacity onPress={handleResendOtp} disabled={resending || isLocked}>
-                  {resending ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Text style={{ ...typography.bodyMd, color: colors.primary, fontWeight: '700' }}>
-                      Resend Code
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
+          {statusMessage && (
+            <Banner
+              variant="success"
+              message={statusMessage}
+            />
+          )}
 
-          {/* Skip option */}
-          <View style={{ marginTop: spacing.xl, alignItems: 'center' }}>
-            <TouchableOpacity
-              onPress={() => {
-                if (params.next) router.replace(params.next as any);
-                else router.replace('/(app)');
-              }}
-            >
-              <Text style={{ ...typography.bodySm, color: colors.textMuted }}>
-                Skip for now (Browse only)
+          {/* Verify Button */}
+          <Button
+            label={loading ? 'Verifying...' : 'Verify & Continue'}
+            onPress={() => triggerVerification(fullOtp)}
+            loading={loading}
+            disabled={fullOtp.length !== 6 || loading || isLocked}
+            fullWidth
+            size="lg"
+            style={{ marginTop: spacing.xs }}
+          />
+
+          {/* Resend Link & Timer */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 6,
+              paddingTop: spacing.xs,
+            }}
+          >
+            <Text style={{ ...typography.secondary, color: colors.textSecondary }}>
+              Didn't receive the code?
+            </Text>
+            {cooldown > 0 ? (
+              <Text
+                style={{
+                  ...typography.secondary,
+                  color: colors.textMuted,
+                  fontWeight: '600',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                Resend in {cooldown}s
               </Text>
-            </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={handleResendOtp} disabled={resending || isLocked}>
+                {resending ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text
+                    style={{
+                      ...typography.secondary,
+                      color: colors.primary,
+                      fontWeight: '700',
+                    }}
+                  >
+                    Resend Code
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </View>
+
+        {/* Skip Link */}
+        <View style={{ alignItems: 'center', paddingTop: spacing.md }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (params.next) router.replace(params.next as any);
+              else router.replace('/(app)');
+            }}
+          >
+            <Text style={{ ...typography.caption, color: colors.textMuted }}>
+              Skip for now (Browse only)
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardScreen>
   );
 }

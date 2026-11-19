@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
-  StyleSheet,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,14 +14,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuthStore } from '../../src/store/authStore';
 import { chatService, getChatSocket } from '../../src/services';
-import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { SkeletonJobCard } from '../../src/components/ui/Skeleton';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { ErrorState } from '../../src/components/ui/ErrorState';
+import { Card } from '../../src/components/ui/Card';
+import { Avatar } from '../../src/components/ui/Avatar';
+import { Badge } from '../../src/components/ui/Badge';
 import type { Conversation } from '../../src/types';
 
 export default function MessagesScreen() {
   const router = useRouter();
-  const { colors, typography, spacing, radii, shadow } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const { user } = useAuthStore();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -79,7 +81,7 @@ export default function MessagesScreen() {
     fetchConversations(true);
   };
 
-  const filtered = conversations.filter(c => {
+  const filtered = conversations.filter((c) => {
     const q = search.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -88,17 +90,6 @@ export default function MessagesScreen() {
       (c.lastMessage?.text && c.lastMessage.text.toLowerCase().includes(q))
     );
   });
-
-  const getInitials = (name?: string) => {
-    if (!name) return '??';
-    return name
-      .split(' ')
-      .filter(Boolean)
-      .map(n => n[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-  };
 
   const formatMessageTime = (dateStr: string) => {
     try {
@@ -122,7 +113,7 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Header */}
       <View
@@ -130,17 +121,17 @@ export default function MessagesScreen() {
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.md,
           borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          backgroundColor: colors.card,
+          borderBottomColor: colors.borderSubtle,
+          backgroundColor: colors.surface,
           gap: spacing.sm,
         }}
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View>
-            <Text style={{ ...typography.bodySm, color: colors.textSecondary, fontWeight: '600' }}>
-              Direct Chat
+            <Text style={{ ...typography.caption, color: colors.textSecondary, fontWeight: '600' }}>
+              Direct Campus Coordination
             </Text>
-            <Text style={{ ...typography.headingLg, color: colors.text, fontWeight: '800' }}>
+            <Text style={{ ...typography.title, fontSize: 24, color: colors.text, fontWeight: '700' }}>
               Messages
             </Text>
           </View>
@@ -148,13 +139,17 @@ export default function MessagesScreen() {
           <TouchableOpacity
             onPress={onRefresh}
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: radii.md,
-              backgroundColor: colors.bgSecondary,
+              width: 44,
+              height: 44,
+              borderRadius: radii.full,
+              backgroundColor: colors.surfaceSecondary,
               alignItems: 'center',
               justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: colors.borderSubtle,
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh messages"
           >
             <Ionicons name="reload-outline" size={18} color={colors.text} />
           </TouchableOpacity>
@@ -165,26 +160,26 @@ export default function MessagesScreen() {
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: colors.bgSecondary,
+            backgroundColor: colors.surfaceSecondary,
             borderRadius: radii.md,
             paddingHorizontal: spacing.md,
-            height: 42,
+            height: 48,
             gap: spacing.sm,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: colors.borderSubtle,
           }}
         >
-          <Ionicons name="search-outline" size={18} color={colors.textMuted} />
+          <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
           <TextInput
-            placeholder="Search conversations..."
-            placeholderTextColor={colors.textMuted}
+            placeholder="Search conversations or gigs..."
+            placeholderTextColor={colors.textSecondary}
             value={search}
             onChangeText={setSearch}
             style={{ flex: 1, color: colors.text, fontSize: 14 }}
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
@@ -192,29 +187,38 @@ export default function MessagesScreen() {
 
       {/* Content */}
       {loading ? (
-        <LoadingSpinner message="Loading chats..." />
+        <View style={{ padding: spacing.lg, gap: spacing.md }}>
+          <SkeletonJobCard />
+          <SkeletonJobCard />
+        </View>
       ) : error ? (
         <ErrorState message={error} onRetry={() => fetchConversations()} />
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={{
-            padding: spacing.md,
+            padding: spacing.lg,
             gap: spacing.sm,
             flexGrow: 1,
+            paddingBottom: 40,
           }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
           }
           ListEmptyComponent={
             <EmptyState
-              emoji="💬"
-              title={search ? 'No results found' : 'No Messages Yet'}
+              iconName="chatbubbles-outline"
+              title={search ? 'No conversations found' : 'No Messages Yet'}
               description={
                 search
-                  ? 'Try searching with another keyword.'
-                  : 'Direct chat connects you with your gig partner once an application is confirmed.'
+                  ? 'No messages match your search keyword.'
+                  : 'Direct chat connects you with your gig partner once an application or post is confirmed.'
               }
               actionLabel={search ? 'Clear Search' : undefined}
               onAction={search ? () => setSearch('') : undefined}
@@ -241,126 +245,98 @@ export default function MessagesScreen() {
                   } as any);
                 }}
                 activeOpacity={0.75}
-                style={{
-                  backgroundColor: colors.card,
-                  borderRadius: radii.lg,
-                  padding: spacing.md,
-                  borderWidth: 1,
-                  borderColor: hasUnread ? colors.primary : colors.border,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.md,
-                  ...shadow.sm,
-                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Chat with ${item.peer.name} about ${item.jobTitle}`}
               >
-                {/* Avatar with verified check badge */}
-                <View style={{ position: 'relative' }}>
-                  <View
-                    style={{
-                      width: 50,
-                      height: 50,
-                      borderRadius: 25,
-                      backgroundColor: colors.primaryLight,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1.5,
-                      borderColor: colors.primary,
-                    }}
-                  >
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: colors.primary }}>
-                      {getInitials(item.peer.name)}
-                    </Text>
-                  </View>
-                  {item.peer.isVerified && (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        bottom: -2,
-                        right: -2,
-                        backgroundColor: colors.success,
-                        width: 18,
-                        height: 18,
-                        borderRadius: 9,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderWidth: 1.5,
-                        borderColor: colors.card,
-                      }}
-                    >
-                      <Ionicons name="checkmark" size={12} color="#fff" />
-                    </View>
-                  )}
-                </View>
+                <Card
+                  variant={hasUnread ? 'outlined' : 'elevated'}
+                  style={{
+                    backgroundColor: hasUnread ? colors.primaryBg : colors.surface,
+                    borderColor: hasUnread ? colors.primary : colors.borderSubtle,
+                    padding: spacing.md,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.md,
+                  }}
+                >
+                  <Avatar
+                    name={item.peer.name}
+                    size="md"
+                    isVerified={item.peer.isVerified}
+                  />
 
-                {/* Details */}
-                <View style={{ flex: 1, gap: 2 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  {/* Details */}
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                        <Text
+                          style={{
+                            ...typography.heading,
+                            fontSize: 15,
+                            color: colors.text,
+                            fontWeight: '700',
+                          }}
+                          numberOfLines={1}
+                        >
+                          {item.peer.name}
+                        </Text>
+                        <Badge
+                          label={item.peer.role}
+                          variant={item.peer.role === 'RECRUITER' ? 'warning' : 'primary'}
+                          size="sm"
+                        />
+                      </View>
+
+                      {item.lastMessage && (
+                        <Text
+                          style={{
+                            ...typography.caption,
+                            color: colors.textSecondary,
+                            fontVariant: ['tabular-nums'],
+                          }}
+                        >
+                          {formatMessageTime(item.lastMessage.createdAt)}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Gig Title Badge */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="briefcase-outline" size={12} color={colors.textSecondary} />
                       <Text
-                        style={{ ...typography.headingSm, color: colors.text, fontWeight: '700' }}
+                        style={{ ...typography.caption, color: colors.textSecondary, fontWeight: '600' }}
                         numberOfLines={1}
                       >
-                        {item.peer.name}
+                        {item.jobTitle}
                       </Text>
-                      <View
-                        style={{
-                          backgroundColor: `${colors.primary}15`,
-                          paddingHorizontal: 6,
-                          paddingVertical: 1,
-                          borderRadius: radii.sm,
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
-                          {item.peer.role}
-                        </Text>
-                      </View>
                     </View>
 
-                    {item.lastMessage && (
-                      <Text style={{ ...typography.caption, color: colors.textMuted }}>
-                        {formatMessageTime(item.lastMessage.createdAt)}
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Gig Title Badge */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="briefcase-outline" size={12} color={colors.textSecondary} />
+                    {/* Last Message */}
                     <Text
-                      style={{ ...typography.caption, color: colors.textSecondary, fontWeight: '600' }}
+                      style={{
+                        ...typography.body,
+                        fontSize: 13,
+                        color: hasUnread ? colors.text : colors.textSecondary,
+                        fontWeight: hasUnread ? '700' : '400',
+                        marginTop: 2,
+                      }}
                       numberOfLines={1}
                     >
-                      {item.jobTitle}
+                      {item.lastMessage ? item.lastMessage.text : 'Start chatting now...'}
                     </Text>
                   </View>
 
-                  {/* Last Message */}
-                  <Text
-                    style={{
-                      ...typography.bodySm,
-                      color: hasUnread ? colors.text : colors.textSecondary,
-                      fontWeight: hasUnread ? '700' : '400',
-                      marginTop: 2,
-                    }}
-                    numberOfLines={1}
-                  >
-                    {item.lastMessage ? item.lastMessage.text : 'Start chatting now...'}
-                  </Text>
-                </View>
-
-                {/* Right unread indicator */}
-                {hasUnread ? (
-                  <View
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: colors.primary,
-                    }}
-                  />
-                ) : (
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                )}
+                  {hasUnread && (
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: colors.primary,
+                      }}
+                    />
+                  )}
+                </Card>
               </TouchableOpacity>
             );
           }}

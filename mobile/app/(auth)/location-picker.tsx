@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
-import { Input } from '../../src/components/ui/Input';
+import { TextField } from '../../src/components/ui/TextField';
 import { Button } from '../../src/components/ui/Button';
 import { userService } from '../../src/services';
 
 const CAMPUS_PRESETS = [
-  { label: 'Delhi University, North Campus', subtitle: 'New Delhi, Delhi', lat: 28.6890, lng: 77.2098 },
+  { label: 'Delhi University, North Campus', subtitle: 'New Delhi, Delhi', lat: 28.689, lng: 77.2098 },
   { label: 'IIT Delhi, Hauz Khas', subtitle: 'New Delhi, Delhi', lat: 28.5454, lng: 77.1926 },
   { label: 'JNU, New Mehrauli Road', subtitle: 'New Delhi, Delhi', lat: 28.5405, lng: 77.1675 },
   { label: 'Jamia Millia Islamia, Okhla', subtitle: 'New Delhi, Delhi', lat: 28.5616, lng: 77.2802 },
@@ -23,19 +30,20 @@ const CAMPUS_PRESETS = [
 
 export default function LocationPickerScreen() {
   const router = useRouter();
-  const { colors, typography, spacing, radii } = useTheme();
+  const { colors, isDark, typography, spacing, radii } = useTheme();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<typeof CAMPUS_PRESETS[0] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const filtered = CAMPUS_PRESETS.filter(p =>
-    p.label.toLowerCase().includes(search.toLowerCase()) ||
-    p.subtitle.toLowerCase().includes(search.toLowerCase())
+  const filtered = CAMPUS_PRESETS.filter(
+    (p) =>
+      p.label.toLowerCase().includes(search.toLowerCase()) ||
+      p.subtitle.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleConfirm = async () => {
     if (!selected) {
-      Alert.alert('Select Location', 'Please choose a campus or location to continue.');
+      Alert.alert('Select Campus', 'Please choose a campus hub to continue.');
       return;
     }
     setLoading(true);
@@ -43,7 +51,7 @@ export default function LocationPickerScreen() {
       await userService.updateLocation(selected.lat, selected.lng, selected.label);
       router.replace('/(app)');
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not update location.');
+      Alert.alert('Location Error', e?.message || 'Could not update location. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -51,129 +59,152 @@ export default function LocationPickerScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ flex: 1, padding: spacing.xl, gap: spacing.lg }}>
-        {/* Header */}
-        <View style={{ gap: spacing.xs }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <View style={{ flex: 1, paddingHorizontal: spacing.xl, paddingTop: spacing.md }}>
+        {/* Top Header */}
+        <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
           <TouchableOpacity
             onPress={() => router.back()}
-            style={{ marginBottom: spacing.xs, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              alignSelf: 'flex-start',
+              marginBottom: spacing.xs,
+            }}
           >
-            <Ionicons name="arrow-back" size={20} color={colors.primary} />
-            <Text style={{ ...typography.bodyMd, color: colors.primary, fontWeight: '600' }}>Back</Text>
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
+            <Text style={{ ...typography.secondary, color: colors.text, fontWeight: '600' }}>
+              Back
+            </Text>
           </TouchableOpacity>
-          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.text }}>
-            Select Campus Hub
+
+          <Text
+            style={{
+              ...typography.title,
+              fontSize: 26,
+              lineHeight: 34,
+              color: colors.text,
+              fontWeight: '700',
+            }}
+          >
+            Select campus hub
           </Text>
-          <Text style={{ ...typography.bodyMd, color: colors.textSecondary }}>
+          <Text
+            style={{
+              ...typography.secondary,
+              color: colors.textSecondary,
+              lineHeight: 20,
+            }}
+          >
             Choose your campus area so JobHunt can show gigs within 5 km of you.
           </Text>
         </View>
 
-        {/* Search */}
-        <Input
-          placeholder="Search campus or city..."
-          value={search}
-          onChangeText={setSearch}
-          leftIcon={<Ionicons name="search-outline" size={18} color={colors.textMuted} />}
-        />
+        {/* Search Input */}
+        <View style={{ marginBottom: spacing.md }}>
+          <TextField
+            placeholder="Search campus or city..."
+            value={search}
+            onChangeText={setSearch}
+            leftIcon={<Ionicons name="search-outline" size={18} color={colors.textMuted} />}
+          />
+        </View>
 
-        {/* List of campuses */}
+        {/* Campus List */}
         <FlatList
           data={filtered}
-          keyExtractor={item => item.label}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          keyExtractor={(item) => item.label}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 100, gap: spacing.sm }}
           renderItem={({ item }) => {
             const isSelected = selected?.label === item.label;
             return (
               <TouchableOpacity
                 onPress={() => setSelected(item)}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isSelected }}
                 style={{
-                  backgroundColor: isSelected ? colors.primaryLight : colors.bgSecondary,
-                  borderRadius: radii.lg,
+                  backgroundColor: isSelected ? colors.primaryBg : colors.surface,
+                  borderRadius: radii.card,
                   padding: spacing.md,
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: spacing.md,
-                  borderWidth: 1.5,
-                  borderColor: isSelected ? colors.primary : colors.border,
+                  borderWidth: isSelected ? 2 : 1,
+                  borderColor: isSelected ? colors.primary : colors.borderSubtle,
                 }}
               >
-                <View style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 19,
-                  backgroundColor: isSelected ? colors.primary : colors.bgTertiary,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: radii.full,
+                    backgroundColor: isSelected ? colors.primary : colors.bgTertiary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <Ionicons
-                    name="school-outline"
-                    size={18}
-                    color={isSelected ? '#fff' : colors.textSecondary}
+                    name="location-outline"
+                    size={20}
+                    color={isSelected ? '#FFFFFF' : colors.textSecondary}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{
-                    ...typography.headingSm,
-                    color: isSelected ? colors.primary : colors.text,
-                    fontWeight: isSelected ? '700' : '600',
-                  }}>
+
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text
+                    style={{
+                      ...typography.body,
+                      fontWeight: isSelected ? '700' : '600',
+                      color: colors.text,
+                    }}
+                  >
                     {item.label}
                   </Text>
-                  <Text style={{ ...typography.bodySm, color: colors.textSecondary, marginTop: 2 }}>
+                  <Text
+                    style={{
+                      ...typography.caption,
+                      color: colors.textSecondary,
+                    }}
+                  >
                     {item.subtitle}
                   </Text>
                 </View>
-                {isSelected ? (
-                  <View style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 12,
-                    backgroundColor: colors.primary,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                    <Ionicons name="checkmark" size={14} color="#fff" />
-                  </View>
-                ) : (
-                  <View style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: 12,
-                    borderWidth: 2,
-                    borderColor: colors.border,
-                  }} />
-                )}
+
+                <Ionicons
+                  name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={22}
+                  color={isSelected ? colors.primary : colors.border}
+                />
               </TouchableOpacity>
             );
           }}
-          ListEmptyComponent={
-            <View style={{ padding: spacing.xl, alignItems: 'center', gap: spacing.sm }}>
-              <Ionicons name="search-outline" size={36} color={colors.textMuted} />
-              <Text style={{ ...typography.headingSm, color: colors.text, fontWeight: '700' }}>No campus found</Text>
-              <Text style={{ ...typography.bodySm, color: colors.textSecondary, textAlign: 'center' }}>
-                We are expanding to more campuses soon! Select the nearest city option above.
-              </Text>
-            </View>
-          }
-          style={{ flex: 1 }}
-          showsVerticalScrollIndicator={false}
         />
 
-        {/* Footer */}
-        <View style={{ gap: spacing.xs }}>
+        {/* Sticky Confirm Button */}
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: spacing.xl,
+            backgroundColor: colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: colors.borderSubtle,
+          }}
+        >
           <Button
-            label={selected ? `Set Location to ${selected.label.split(',')[0].trim()}` : 'Confirm Location'}
+            label="Confirm Campus Location"
             onPress={handleConfirm}
+            disabled={!selected || loading}
             loading={loading}
-            disabled={!selected}
             fullWidth
             size="lg"
           />
-          <Text style={{ ...typography.caption, color: colors.textMuted, textAlign: 'center' }}>
-            You can change your location anytime from your Profile settings.
-          </Text>
         </View>
       </View>
     </SafeAreaView>

@@ -1,3 +1,4 @@
+import dns from 'dns';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -5,6 +6,10 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
 
 import { authRouter, normalizeExistingUserEmails } from './routes/auth.js';
 import { usersRouter } from './routes/users.js';
@@ -73,6 +78,14 @@ app.use(
 
 app.use(express.json());
 
+// Request logger (method, path, status code)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.on('finish', () => {
+    console.log(`[HTTP] ${req.method} ${req.originalUrl} -> ${res.statusCode}`);
+  });
+  next();
+});
+
 // Initialize Real-Time WebSocket Server
 export const io = new SocketIOServer(httpServer, {
   cors: {
@@ -133,13 +146,33 @@ app.use((_req: Request, res: Response) => {
 // Global error handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[API Server Error]:', err);
+  if (
+    err?.name === 'PrismaClientInitializationError' ||
+    err?.message?.includes("Can't reach database server")
+  ) {
+    return sendError(
+      res,
+      'DATABASE_UNAVAILABLE',
+      'Database connection failed. Set a real PostgreSQL DATABASE_URL in backend/.env and run prisma migrate deploy.',
+      503
+    );
+  }
   return sendError(res, 'INTERNAL_SERVER_ERROR', err?.message || 'Server error occurred', 500);
+});
+
+httpServer.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Stop the other backend first.`);
+    process.exit(1);
+  }
+  console.error('[HTTP Server Error]:', err);
+  process.exit(1);
 });
 
 // Start listening on 0.0.0.0
 httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 JobHunt Backend REST & Real-Time API running at http://0.0.0.0:${PORT}/api/v1`);
-  console.log(`📡 Local Network: http://10.162.68.159:${PORT}/api/v1`);
+  console.log(`📡 Local Network: http://10.10.134.145:${PORT}/api/v1`);
   console.log(`💻 Local Machine: http://localhost:${PORT}/api/v1`);
 
   // Normalize existing database user emails to lowercase on startup

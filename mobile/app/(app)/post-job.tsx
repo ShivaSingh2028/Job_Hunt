@@ -1,22 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert, Switch,
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  Switch,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAuthStore } from '../../src/store/authStore';
 import { jobService, userService, authService } from '../../src/services';
-import { Input } from '../../src/components/ui/Input';
+import { TextField } from '../../src/components/ui/TextField';
 import { Button } from '../../src/components/ui/Button';
+import { Card } from '../../src/components/ui/Card';
+import { Chip } from '../../src/components/ui/Chip';
+import { Badge } from '../../src/components/ui/Badge';
+import { SectionHeader } from '../../src/components/ui/SectionHeader';
+import { KeyboardScreen } from '../../src/components/ui/KeyboardScreen';
 import type { JobType, PayUnit } from '../../src/types';
 import { validateShortTermHours } from '../../src/utils/businessRules';
 
 export default function PostJobScreen() {
   const router = useRouter();
-  const { colors, typography, spacing, radii } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const { user } = useAuthStore();
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const nextMonthStr = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
   const [type, setType] = useState<JobType>('SHORT_TERM');
   const [title, setTitle] = useState('');
@@ -26,18 +40,41 @@ export default function PostJobScreen() {
   const [openings, setOpenings] = useState('1');
   const [isRemote, setIsRemote] = useState(false);
   const [locationLabel, setLocationLabel] = useState('Campus Student Center, Room 204');
-  const [startDate, setStartDate] = useState('2026-10-25');
-  const [endDate, setEndDate] = useState('2026-10-25');
+  const [startDate, setStartDate] = useState(todayStr);
+  const [endDate, setEndDate] = useState(nextMonthStr);
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('13:00');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Refresh user verification status from server on mount
+  // Refresh user verification status from server on mount and ensure RECRUITER mode
   useEffect(() => {
     if (process.env.EXPO_PUBLIC_USE_MOCK !== 'true') {
-      userService.getMe().then((fresh) => {
-        if (fresh) useAuthStore.getState().setUser(fresh);
+      userService.getMe().then(async (fresh) => {
+        if (fresh) {
+          useAuthStore.getState().setUser(fresh);
+          if (fresh.activeMode !== 'RECRUITER') {
+            try {
+              const res = await userService.switchMode('RECRUITER');
+              if ('error' in res && res.error) {
+                const items = res.error.pendingItems || [];
+                const itemTitles = items.map((i: any) => `• ${i.title || 'Accepted gig'}`).join('\n');
+                Alert.alert(
+                  'Seeker Commitments Active',
+                  `You have active accepted gigs as a Seeker.\n\n${itemTitles || '• Accepted gig in progress'}\n\nPlease complete or withdraw these commitments in 'My Gigs' before posting a gig.`,
+                  [
+                    { text: 'Go to My Gigs', onPress: () => router.replace('/(app)/my-jobs' as any) },
+                    { text: 'Go Back', style: 'cancel', onPress: () => router.back() },
+                  ]
+                );
+                return;
+              }
+              useAuthStore.getState().setUser({ ...fresh, activeMode: 'RECRUITER' });
+            } catch (err: any) {
+              console.warn('[POST-JOB] Auto mode switch error:', err?.message);
+            }
+          }
+        }
       }).catch(() => {});
     }
   }, []);
@@ -45,7 +82,7 @@ export default function PostJobScreen() {
   const openVerificationGate = (emailToVerify: string) => {
     Alert.alert(
       'Email Verification Required',
-      'Please verify your email address before posting gigs. We will send a 6-digit confirmation code.',
+      'Please verify your student email address before publishing gigs. A 6-digit confirmation code will be sent to your inbox.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -72,7 +109,7 @@ export default function PostJobScreen() {
     const e: Record<string, string> = {};
     if (!title.trim()) e.title = 'Title is required';
     if (!description.trim()) e.description = 'Description is required';
-    if (!pay || isNaN(Number(pay)) || Number(pay) <= 0) e.pay = 'Enter a valid pay amount';
+    if (!pay || isNaN(Number(pay)) || Number(pay) <= 0) e.pay = 'Enter a valid amount';
     if (!openings || isNaN(Number(openings)) || Number(openings) < 1) e.openings = 'Min 1 opening';
 
     if (type === 'SHORT_TERM') {
@@ -88,15 +125,19 @@ export default function PostJobScreen() {
     }
 
     if (!isRemote && !locationLabel.trim()) {
-      e.location = 'On-site jobs require an exact location/address';
+      e.location = 'On-site jobs require an exact location or room';
     }
 
     setErrors(e);
-    return Object.keys(e).length === 0;
+    if (Object.keys(e).length > 0) {
+      const firstError = Object.values(e)[0];
+      Alert.alert('Required Information', firstError);
+      return false;
+    }
+    return true;
   };
 
   const handlePost = async () => {
-    // Check server value of user as single source of truth
     let currentUser = user;
     if (process.env.EXPO_PUBLIC_USE_MOCK !== 'true') {
       try {
@@ -111,6 +152,31 @@ export default function PostJobScreen() {
     if (currentUser && !currentUser.isVerified) {
       openVerificationGate(currentUser.email);
       return;
+    }
+
+    // Auto ensure mode is RECRUITER before posting
+    if (currentUser && currentUser.activeMode !== 'RECRUITER') {
+      try {
+        const res = await userService.switchMode('RECRUITER');
+        if ('error' in res && res.error) {
+          const items = res.error.pendingItems || [];
+          const itemTitles = items.map((i: any) => `• ${i.title || 'Accepted gig'}`).join('\n');
+          Alert.alert(
+            'Cannot Post Gig',
+            `You cannot publish gigs while you have active commitments as a Seeker.\n\nActive Commitments:\n${itemTitles || '• Accepted gig in progress'}\n\nPlease complete or withdraw these commitments in 'My Gigs' before posting.`,
+            [
+              { text: 'Go to My Gigs', onPress: () => router.replace('/(app)/my-jobs' as any) },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+          return;
+        }
+        useAuthStore.getState().setUser({ ...currentUser, activeMode: 'RECRUITER' });
+        currentUser = { ...currentUser, activeMode: 'RECRUITER' };
+      } catch (err: any) {
+        Alert.alert('Recruiter Mode Required', err?.message || 'Please switch to Recruiter mode before posting a gig.');
+        return;
+      }
     }
 
     if (!validate()) return;
@@ -137,7 +203,7 @@ export default function PostJobScreen() {
 
       Alert.alert(
         'Listing Published',
-        'Your gig is now live and visible to students within campus radius.',
+        'Your gig is live and visible to students within campus radius.',
         [{ text: 'View My Posts', onPress: () => router.replace('/(app)/my-jobs') }]
       );
     } catch (e: any) {
@@ -151,34 +217,57 @@ export default function PostJobScreen() {
     }
   };
 
+  const payUnitOptions: { label: string; value: PayUnit }[] =
+    type === 'SHORT_TERM'
+      ? [
+          { label: 'Fixed ₹', value: 'FIXED' },
+          { label: '₹ / hr', value: 'PER_HOUR' },
+        ]
+      : [
+          { label: '₹ / mo', value: 'PER_MONTH' },
+          { label: '₹ / hr', value: 'PER_HOUR' },
+          { label: 'Fixed ₹', value: 'FIXED' },
+        ];
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      {/* Header */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        backgroundColor: colors.card,
-      }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      {/* Top Navigation Bar */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.borderSubtle,
+          backgroundColor: colors.surface,
+        }}
+      >
         <TouchableOpacity
           onPress={() => router.back()}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 }}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel job creation"
         >
           <Ionicons name="arrow-back" size={20} color={colors.primary} />
-          <Text style={{ ...typography.bodyMd, color: colors.primary, fontWeight: '600' }}>Cancel</Text>
+          <Text style={{ ...typography.body, color: colors.primary, fontWeight: '600' }}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={{ ...typography.headingMd, color: colors.text, fontWeight: '700' }}>Publish a Gig</Text>
+        <Text style={{ ...typography.heading, color: colors.text, fontWeight: '700' }}>
+          Publish a Gig
+        </Text>
         <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }} keyboardShouldPersistTaps="handled">
-        {/* Job Type Selector */}
-        <View style={{ gap: spacing.xs }}>
-          <Text style={{ ...typography.label, color: colors.textSecondary }}>GIG TYPE</Text>
+      <KeyboardScreen contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg, paddingBottom: 48 }}>
+        {/* Step 1: Gig Type Selection */}
+        <Card variant="elevated" style={{ gap: spacing.md, padding: spacing.cardPadding }}>
+          <SectionHeader
+            title="Gig Format"
+            subtitle="Choose between quick on-demand campus tasks or ongoing engagements."
+          />
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
             <TouchableOpacity
               onPress={() => {
@@ -186,26 +275,41 @@ export default function PostJobScreen() {
                 setIsRemote(false);
                 setPayUnit('FIXED');
               }}
+              activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: type === 'SHORT_TERM' }}
               style={{
                 flex: 1,
                 padding: spacing.md,
-                borderRadius: radii.lg,
-                backgroundColor: type === 'SHORT_TERM' ? colors.primaryLight : colors.bgSecondary,
+                borderRadius: radii.md,
+                backgroundColor: type === 'SHORT_TERM' ? colors.primaryBg : colors.surfaceSecondary,
                 borderWidth: 1.5,
-                borderColor: type === 'SHORT_TERM' ? colors.primary : colors.border,
+                borderColor: type === 'SHORT_TERM' ? colors.primary : colors.borderSubtle,
                 gap: 6,
               }}
             >
-              <Ionicons
-                name="flash"
-                size={20}
-                color={type === 'SHORT_TERM' ? colors.primary : colors.textSecondary}
-              />
-              <Text style={{ ...typography.headingSm, color: type === 'SHORT_TERM' ? colors.primary : colors.text, fontWeight: '700' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Ionicons
+                  name="flash"
+                  size={20}
+                  color={type === 'SHORT_TERM' ? colors.primary : colors.textSecondary}
+                />
+                {type === 'SHORT_TERM' && (
+                  <Badge label="Active" variant="primary" size="sm" />
+                )}
+              </View>
+              <Text
+                style={{
+                  ...typography.heading,
+                  fontSize: 16,
+                  color: type === 'SHORT_TERM' ? colors.primary : colors.text,
+                  fontWeight: '700',
+                }}
+              >
                 Short-Term
               </Text>
-              <Text style={{ ...typography.caption, color: colors.textMuted }}>
-                On-site · Up to 5 hrs
+              <Text style={{ ...typography.caption, color: colors.textSecondary }}>
+                On-site · Up to 5 hours max
               </Text>
             </TouchableOpacity>
 
@@ -214,198 +318,244 @@ export default function PostJobScreen() {
                 setType('LONG_TERM');
                 setPayUnit('PER_MONTH');
               }}
+              activeOpacity={0.8}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: type === 'LONG_TERM' }}
               style={{
                 flex: 1,
                 padding: spacing.md,
-                borderRadius: radii.lg,
-                backgroundColor: type === 'LONG_TERM' ? colors.primaryLight : colors.bgSecondary,
+                borderRadius: radii.md,
+                backgroundColor: type === 'LONG_TERM' ? colors.primaryBg : colors.surfaceSecondary,
                 borderWidth: 1.5,
-                borderColor: type === 'LONG_TERM' ? colors.primary : colors.border,
+                borderColor: type === 'LONG_TERM' ? colors.primary : colors.borderSubtle,
                 gap: 6,
               }}
             >
-              <Ionicons
-                name="calendar-outline"
-                size={20}
-                color={type === 'LONG_TERM' ? colors.primary : colors.textSecondary}
-              />
-              <Text style={{ ...typography.headingSm, color: type === 'LONG_TERM' ? colors.primary : colors.text, fontWeight: '700' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={20}
+                  color={type === 'LONG_TERM' ? colors.primary : colors.textSecondary}
+                />
+                {type === 'LONG_TERM' && (
+                  <Badge label="Active" variant="primary" size="sm" />
+                )}
+              </View>
+              <Text
+                style={{
+                  ...typography.heading,
+                  fontSize: 16,
+                  color: type === 'LONG_TERM' ? colors.primary : colors.text,
+                  fontWeight: '700',
+                }}
+              >
                 Long-Term
               </Text>
-              <Text style={{ ...typography.caption, color: colors.textMuted }}>
-                1-2 months · Remote / On-site
+              <Text style={{ ...typography.caption, color: colors.textSecondary }}>
+                1–2 months · Remote / On-site
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Card>
 
-        {/* Form Inputs */}
-        <Input
-          label="Gig Title *"
-          placeholder="e.g. Science Lab Assistant, Event Coordinator"
-          value={title}
-          onChangeText={setTitle}
-          error={errors.title}
-        />
+        {/* Step 2: Role Details */}
+        <Card variant="elevated" style={{ gap: spacing.md, padding: spacing.cardPadding }}>
+          <SectionHeader
+            title="Role Details"
+            subtitle="Clearly define what help is needed and required openings."
+          />
+          <TextField
+            label="Gig Title"
+            placeholder="e.g. Science Lab Assistant, Event Coordinator"
+            value={title}
+            onChangeText={setTitle}
+            error={errors.title}
+            leftIcon={<Ionicons name="briefcase-outline" size={18} color={colors.textSecondary} />}
+          />
 
-        <Input
-          label="Description *"
-          placeholder="Detailed tasks, responsibilities, prerequisites..."
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={3}
-          style={{ minHeight: 70, textAlignVertical: 'top' }}
-          error={errors.description}
-        />
+          <TextField
+            label="Description & Responsibilities"
+            placeholder="Specify key tasks, arrival instructions, and prerequisites..."
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            error={errors.description}
+            helperText="Clear details attract dependable, qualified applicants."
+          />
 
-        {/* Pay & Unit */}
-        <View style={{ gap: spacing.xs }}>
-          <Text style={{ ...typography.label, color: colors.textSecondary }}>COMPENSATION *</Text>
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <Input
-              placeholder="Amount (₹)"
-              value={pay}
-              onChangeText={setPay}
-              keyboardType="numeric"
-              containerStyle={{ flex: 1 }}
-              error={errors.pay}
-            />
-            <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-              {(type === 'SHORT_TERM' ? (['FIXED', 'PER_HOUR'] as PayUnit[]) : (['PER_MONTH', 'PER_HOUR', 'FIXED'] as PayUnit[])).map(u => (
-                <TouchableOpacity
-                  key={u}
-                  onPress={() => setPayUnit(u)}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 12,
-                    borderRadius: radii.md,
-                    backgroundColor: payUnit === u ? colors.primary : colors.bgSecondary,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                  }}
-                >
-                  <Text style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: payUnit === u ? '#fff' : colors.text,
-                  }}>
-                    {u === 'FIXED' ? 'Fixed' : u === 'PER_HOUR' ? '/hr' : '/mo'}
-                  </Text>
-                </TouchableOpacity>
+          <TextField
+            label="Required Student Openings"
+            placeholder="1"
+            value={openings}
+            onChangeText={setOpenings}
+            keyboardType="number-pad"
+            error={errors.openings}
+            leftIcon={<Ionicons name="people-outline" size={18} color={colors.textSecondary} />}
+          />
+        </Card>
+
+        {/* Step 3: Compensation */}
+        <Card variant="elevated" style={{ gap: spacing.md, padding: spacing.cardPadding }}>
+          <SectionHeader
+            title="Compensation"
+            subtitle="Transparent pay structure for students upon task completion."
+          />
+          <TextField
+            label="Pay Amount"
+            placeholder="e.g. 500"
+            value={pay}
+            onChangeText={setPay}
+            keyboardType="numeric"
+            error={errors.pay}
+            leftIcon={<Ionicons name="cash-outline" size={18} color={colors.textSecondary} />}
+          />
+
+          <View style={{ gap: spacing.xs }}>
+            <Text style={{ ...typography.caption, color: colors.textSecondary, fontWeight: '600' }}>
+              Payment frequency / unit
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
+              {payUnitOptions.map((opt) => (
+                <Chip
+                  key={opt.value}
+                  label={opt.label}
+                  selected={payUnit === opt.value}
+                  onPress={() => setPayUnit(opt.value)}
+                  size="md"
+                />
               ))}
             </View>
           </View>
-        </View>
+        </Card>
 
-        {/* Openings */}
-        <Input
-          label="Number of Openings (Default: 1)"
-          placeholder="1"
-          value={openings}
-          onChangeText={setOpenings}
-          keyboardType="numeric"
-          error={errors.openings}
-        />
-
-        {/* Remote toggle (Long-term only) */}
-        {type === 'LONG_TERM' && (
-          <View style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: colors.bgSecondary,
-            padding: spacing.md,
-            borderRadius: radii.lg,
-          }}>
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Ionicons name="globe-outline" size={16} color={colors.text} />
-                <Text style={{ ...typography.headingSm, color: colors.text, fontWeight: '700' }}>Remote Opportunity</Text>
-              </View>
-              <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }}>
-                Remote gigs are visible to students everywhere.
-              </Text>
-            </View>
-            <Switch
-              value={isRemote}
-              onValueChange={setIsRemote}
-              trackColor={{ false: colors.border, true: colors.primary }}
-            />
-          </View>
-        )}
-
-        {/* Exact Location (On-site only) */}
-        {!isRemote && (
-          <Input
-            label="Reporting Location / Building & Room *"
-            placeholder="e.g. North Campus, Block C, Room 201"
-            value={locationLabel}
-            onChangeText={setLocationLabel}
-            error={errors.location}
+        {/* Step 4: Schedule & Location */}
+        <Card variant="elevated" style={{ gap: spacing.md, padding: spacing.cardPadding }}>
+          <SectionHeader
+            title="Schedule & Location"
+            subtitle="Where and when the student will perform the task."
           />
-        )}
 
-        {/* Time / Dates */}
-        {type === 'SHORT_TERM' ? (
-          <View style={{ gap: spacing.sm }}>
-            <Text style={{ ...typography.label, color: colors.textSecondary }}>DATE & HOURS (MAX 5 HOURS) *</Text>
-            <Input
-              label="Date (YYYY-MM-DD)"
-              value={startDate}
-              onChangeText={setStartDate}
-            />
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Input
-                label="Start Time (HH:MM)"
-                value={startTime}
-                onChangeText={setStartTime}
-                containerStyle={{ flex: 1 }}
-              />
-              <Input
-                label="End Time (HH:MM)"
-                value={endTime}
-                onChangeText={setEndTime}
-                containerStyle={{ flex: 1 }}
-              />
-            </View>
-            {errors.time && (
-              <Text style={{ ...typography.bodySm, color: colors.error }}>{errors.time}</Text>
-            )}
-          </View>
-        ) : (
-          <View style={{ gap: spacing.sm }}>
-            <Text style={{ ...typography.label, color: colors.textSecondary }}>DURATION (1-2 MONTHS) *</Text>
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <Input
-                label="Start Date (YYYY-MM-DD)"
+          {type === 'SHORT_TERM' ? (
+            <View style={{ gap: spacing.md }}>
+              <TextField
+                label="Date of Gig"
                 value={startDate}
                 onChangeText={setStartDate}
-                containerStyle={{ flex: 1 }}
+                placeholder="YYYY-MM-DD"
+                helperText="Must occur on a single day (max 5 hrs)"
+                leftIcon={<Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />}
               />
-              <Input
-                label="End Date (YYYY-MM-DD)"
-                value={endDate}
-                onChangeText={setEndDate}
-                containerStyle={{ flex: 1 }}
-              />
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="Start Time"
+                    value={startTime}
+                    onChangeText={setStartTime}
+                    placeholder="10:00"
+                    leftIcon={<Ionicons name="time-outline" size={18} color={colors.textSecondary} />}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="End Time"
+                    value={endTime}
+                    onChangeText={setEndTime}
+                    placeholder="13:00"
+                    leftIcon={<Ionicons name="time-outline" size={18} color={colors.textSecondary} />}
+                  />
+                </View>
+              </View>
+              {errors.time && (
+                <Text style={{ ...typography.caption, color: colors.dangerText }}>
+                  {errors.time}
+                </Text>
+              )}
             </View>
-            {errors.date && (
-              <Text style={{ ...typography.bodySm, color: colors.error }}>{errors.date}</Text>
-            )}
-          </View>
-        )}
+          ) : (
+            <View style={{ gap: spacing.md }}>
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="Start Date"
+                    value={startDate}
+                    onChangeText={setStartDate}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="End Date"
+                    value={endDate}
+                    onChangeText={setEndDate}
+                    placeholder="YYYY-MM-DD"
+                  />
+                </View>
+              </View>
+              {errors.date && (
+                <Text style={{ ...typography.caption, color: colors.dangerText }}>
+                  {errors.date}
+                </Text>
+              )}
 
-        {/* Submit */}
+              {/* Remote toggle for long-term */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: colors.surfaceSecondary,
+                  padding: spacing.md,
+                  borderRadius: radii.md,
+                  borderWidth: 1,
+                  borderColor: colors.borderSubtle,
+                }}
+              >
+                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="globe-outline" size={16} color={colors.text} />
+                    <Text style={{ ...typography.heading, fontSize: 15, color: colors.text, fontWeight: '600' }}>
+                      Remote Project
+                    </Text>
+                  </View>
+                  <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }}>
+                    Can be completed remotely from anywhere.
+                  </Text>
+                </View>
+                <Switch
+                  value={isRemote}
+                  onValueChange={setIsRemote}
+                  trackColor={{ false: colors.borderSubtle, true: colors.primary }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </View>
+          )}
+
+          {!isRemote && (
+            <TextField
+              label="Campus Location / Building & Room"
+              placeholder="e.g. North Campus, Block C, Room 201"
+              value={locationLabel}
+              onChangeText={setLocationLabel}
+              error={errors.location}
+              helperText="Exact room is kept private until student acceptance is confirmed."
+              leftIcon={<Ionicons name="location-outline" size={18} color={colors.textSecondary} />}
+            />
+          )}
+        </Card>
+
+        {/* Submit Action */}
         <Button
           label="Publish Gig"
           onPress={handlePost}
           loading={loading}
-          fullWidth
+          variant="primary"
           size="lg"
-          style={{ marginTop: spacing.md }}
+          fullWidth
+          icon={<Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
         />
-      </ScrollView>
+      </KeyboardScreen>
     </SafeAreaView>
   );
 }

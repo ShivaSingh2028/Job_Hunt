@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Tabs, Redirect } from 'expo-router';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/store/authStore';
 import { useTheme } from '../../src/hooks/useTheme';
 import { BlockedBanner } from '../../src/components/ui/BlockedBanner';
@@ -21,23 +22,23 @@ function TabIcon({
   focused: boolean;
   badge?: number;
 }) {
-  const { colors } = useTheme();
+  const { colors, typography } = useTheme();
 
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}>
-      <View style={{ position: 'relative' }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 44 }}>
+      <View style={{ width: 28, height: 26, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         <Ionicons
           name={focused ? focusedName : name}
-          size={22}
-          color={focused ? colors.primary : colors.textMuted}
+          size={24}
+          color={focused ? colors.primary : colors.textSecondary}
         />
         {badge !== undefined && badge > 0 && (
           <View
             style={{
               position: 'absolute',
               top: -4,
-              right: -10,
-              backgroundColor: colors.error,
+              right: -9,
+              backgroundColor: colors.danger,
               borderRadius: 8,
               minWidth: 16,
               height: 16,
@@ -46,18 +47,31 @@ function TabIcon({
               paddingHorizontal: 4,
             }}
           >
-            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+            <Text
+              style={{
+                color: '#ffffff',
+                fontSize: 10,
+                fontWeight: '700',
+                fontVariant: ['tabular-nums'],
+                includeFontPadding: false,
+              }}
+            >
               {badge > 9 ? '9+' : badge}
             </Text>
           </View>
         )}
       </View>
       <Text
+        numberOfLines={1}
+        ellipsizeMode="tail"
         style={{
+          ...typography.caption,
           fontSize: 11,
-          color: focused ? colors.primary : colors.textMuted,
+          lineHeight: 14,
+          color: focused ? colors.primary : colors.textSecondary,
           fontWeight: focused ? '700' : '500',
-          marginTop: 3,
+          marginTop: 4,
+          textAlign: 'center',
         }}
       >
         {label}
@@ -70,6 +84,7 @@ export default function AppLayout() {
   const { user, isAuthenticated } = useAuthStore();
   const { colors } = useTheme();
   const { unreadCount, setUnreadCount } = useJobStore();
+  const insets = useSafeAreaInsets();
   const isSeeker = user?.activeMode === 'SEEKER';
 
   useEffect(() => {
@@ -85,6 +100,8 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/welcome" />;
   }
 
+  const bottomInset = Math.max(insets.bottom, 8);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {user?.isBlocked && <BlockedBanner blockedUntil={user.blockedUntil} />}
@@ -92,12 +109,12 @@ export default function AppLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: colors.card,
-            borderTopColor: colors.border,
+            backgroundColor: colors.surface,
+            borderTopColor: colors.borderSubtle,
             borderTopWidth: 1,
-            height: 68,
+            height: 56 + bottomInset,
             paddingTop: 8,
-            paddingBottom: 8,
+            paddingBottom: bottomInset,
           },
           tabBarShowLabel: false,
         }}
@@ -133,9 +150,9 @@ export default function AppLayout() {
           options={{
             tabBarIcon: ({ focused }) => (
               <TabIcon
-                name={isSeeker ? 'briefcase-outline' : 'layers-outline'}
-                focusedName={isSeeker ? 'briefcase' : 'layers'}
-                label={isSeeker ? 'My Gigs' : 'My Posts'}
+                name={isSeeker ? 'briefcase-outline' : 'document-text-outline'}
+                focusedName={isSeeker ? 'briefcase' : 'document-text'}
+                label={isSeeker ? 'My Gigs' : 'Posts'}
                 focused={focused}
               />
             ),
@@ -198,6 +215,13 @@ export default function AppLayout() {
         />
         <Tabs.Screen
           name="saved-jobs"
+          options={{
+            href: null,
+            tabBarStyle: { display: 'none' },
+          }}
+        />
+        <Tabs.Screen
+          name="design-preview"
           options={{
             href: null,
             tabBarStyle: { display: 'none' },

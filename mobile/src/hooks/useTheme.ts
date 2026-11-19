@@ -1,6 +1,6 @@
 import { useColorScheme } from 'react-native';
 import { light, dark } from '../theme/colors';
-import { spacing, radii, typography, shadow } from '../theme';
+import { spacing, radii, typography, lightShadows, darkShadows } from '../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
@@ -9,7 +9,7 @@ export function useTheme() {
   const [overrideScheme, setOverrideScheme] = useState<'light' | 'dark' | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('theme').then(val => {
+    AsyncStorage.getItem('theme').then((val) => {
       if (val === 'light' || val === 'dark') setOverrideScheme(val);
     });
   }, []);
@@ -17,6 +17,7 @@ export function useTheme() {
   const scheme = overrideScheme ?? systemScheme ?? 'light';
   const colors = scheme === 'dark' ? dark : light;
   const isDark = scheme === 'dark';
+  const shadow = isDark ? darkShadows : lightShadows;
 
   const toggleTheme = async () => {
     const next = isDark ? 'light' : 'dark';
@@ -24,5 +25,20 @@ export function useTheme() {
     await AsyncStorage.setItem('theme', next);
   };
 
-  return { colors, isDark, scheme, toggleTheme, spacing, radii, typography, shadow };
+  const setTheme = async (mode: 'light' | 'dark') => {
+    setOverrideScheme(mode);
+    await AsyncStorage.setItem('theme', mode);
+  };
+
+  return {
+    colors,
+    isDark,
+    scheme,
+    toggleTheme,
+    setTheme,
+    spacing,
+    radii,
+    typography,
+    shadow,
+  };
 }

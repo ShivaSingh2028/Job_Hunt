@@ -1,5 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import MapView, { Marker, Circle, UrlTile } from 'react-native-maps';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,12 +17,14 @@ import { jobService } from '../../src/services';
 import type { Job } from '../../src/types';
 import { formatPay, formatDistance } from '../../src/utils/businessRules';
 import { useLiveLocation } from '../../src/hooks/useLiveLocation';
+import { Chip } from '../../src/components/ui/Chip';
+import { Button } from '../../src/components/ui/Button';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function MapScreen() {
   const router = useRouter();
-  const { colors, typography, spacing, radii, shadow } = useTheme();
+  const { colors, typography, spacing, radii, shadow, isDark } = useTheme();
   const { user } = useAuthStore();
   const { jobs, setJobs } = useJobStore();
   const { coords, locationName, isLocating, refreshLocation } = useLiveLocation();
@@ -23,43 +32,52 @@ export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
 
   const liveLat = coords?.lat ?? user?.location?.lat ?? 28.6139;
-  const liveLng = coords?.lng ?? user?.location?.lng ?? 77.2090;
+  const liveLng = coords?.lng ?? user?.location?.lng ?? 77.209;
 
   useEffect(() => {
-    jobService.getJobs(liveLat, liveLng).then(r => {
-      setJobs(r.jobs);
-      if (r.jobs.length > 0) setSelectedJob(r.jobs[0]);
-    }).catch(() => {});
+    jobService
+      .getJobs(liveLat, liveLng)
+      .then((r) => {
+        setJobs(r.jobs);
+        if (r.jobs.length > 0) setSelectedJob(r.jobs[0]);
+      })
+      .catch(() => {});
   }, [liveLat, liveLng]);
 
   useEffect(() => {
     if (coords && mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: coords.lat,
-        longitude: coords.lng,
-        latitudeDelta: 0.06,
-        longitudeDelta: 0.06,
-      }, 800);
+      mapRef.current.animateToRegion(
+        {
+          latitude: coords.lat,
+          longitude: coords.lng,
+          latitudeDelta: 0.06,
+          longitudeDelta: 0.06,
+        },
+        800
+      );
     }
   }, [coords?.lat, coords?.lng]);
 
-  const onSiteJobs = jobs.filter(j => !j.isRemote && j.location.lat !== 0);
+  const onSiteJobs = jobs.filter((j) => !j.isRemote && j.location.lat !== 0);
 
   const centerOnUser = () => {
     refreshLocation();
     if (mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: liveLat,
-        longitude: liveLng,
-        latitudeDelta: 0.04,
-        longitudeDelta: 0.04,
-      }, 600);
+      mapRef.current.animateToRegion(
+        {
+          latitude: liveLat,
+          longitude: liveLng,
+          latitudeDelta: 0.04,
+          longitudeDelta: 0.04,
+        },
+        600
+      );
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Map */}
+      {/* Map Component */}
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -70,51 +88,54 @@ export default function MapScreen() {
           longitudeDelta: 0.06,
         }}
       >
-        {/* OpenStreetMap free tile overlay */}
         <UrlTile
           urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           maximumZ={19}
           flipY={false}
         />
 
-        {/* User Real-Time Live Location Marker */}
+        {/* User Live GPS Marker */}
         <Marker
           coordinate={{ latitude: liveLat, longitude: liveLng }}
           title="Your Live Location"
           description={locationName || 'Live GPS Location'}
         >
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            <View style={{
-              width: 24,
-              height: 24,
-              borderRadius: 12,
-              backgroundColor: 'rgba(14, 165, 233, 0.25)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <View style={{
-                width: 14,
-                height: 14,
-                borderRadius: 7,
-                backgroundColor: '#0ea5e9',
-                borderWidth: 2,
-                borderColor: '#ffffff',
-              }} />
+            <View
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: radii.full,
+                backgroundColor: 'rgba(59, 130, 246, 0.25)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <View
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: radii.full,
+                  backgroundColor: '#2563EB',
+                  borderWidth: 2.5,
+                  borderColor: '#FFFFFF',
+                }}
+              />
             </View>
           </View>
         </Marker>
 
-        {/* 5 km radius circle around live location */}
+        {/* 5 km Radius Boundary */}
         <Circle
           center={{ latitude: liveLat, longitude: liveLng }}
-          radius={5000} // 5 km = 5000 meters
-          strokeColor="rgba(124, 58, 237, 0.6)"
+          radius={5000}
+          strokeColor="rgba(124, 58, 237, 0.5)"
           fillColor="rgba(124, 58, 237, 0.08)"
           strokeWidth={2}
         />
 
         {/* Job Pins */}
-        {onSiteJobs.map(job => {
+        {onSiteJobs.map((job) => {
           const isSelected = selectedJob?.id === job.id;
           const isShortTerm = job.type === 'SHORT_TERM';
           return (
@@ -123,32 +144,34 @@ export default function MapScreen() {
               coordinate={{ latitude: job.location.lat, longitude: job.location.lng }}
               onPress={() => setSelectedJob(job)}
             >
-              <View style={{
-                backgroundColor: isSelected ? colors.primary : '#fff',
-                paddingHorizontal: 8,
-                paddingVertical: 5,
-                borderRadius: radii.full,
-                borderWidth: 2,
-                borderColor: colors.primary,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 3,
-                elevation: 4,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 5,
-              }}>
+              <View
+                style={{
+                  backgroundColor: isSelected ? colors.primary : colors.surface,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: radii.full,
+                  borderWidth: 2,
+                  borderColor: colors.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  ...shadow.sm,
+                }}
+              >
                 <Ionicons
                   name={isShortTerm ? 'flash' : 'calendar-outline'}
                   size={12}
-                  color={isSelected ? '#fff' : colors.primary}
+                  color={isSelected ? '#FFFFFF' : colors.primary}
                 />
-                <Text style={{
-                  fontSize: 11,
-                  fontWeight: '800',
-                  color: isSelected ? '#fff' : colors.primary,
-                }}>
+                <Text
+                  style={{
+                    ...typography.caption,
+                    fontSize: 12,
+                    fontWeight: '700',
+                    fontVariant: ['tabular-nums'],
+                    color: isSelected ? '#FFFFFF' : colors.primary,
+                  }}
+                >
                   ₹{job.pay}
                 </Text>
               </View>
@@ -157,35 +180,66 @@ export default function MapScreen() {
         })}
       </MapView>
 
-      {/* Top Overlay Header */}
-      <View style={{
-        position: 'absolute',
-        top: 50,
-        left: spacing.lg,
-        right: spacing.lg,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <View style={{
-          backgroundColor: colors.card,
-          paddingHorizontal: 14,
-          paddingVertical: 8,
-          borderRadius: radii.full,
+      {/* Top Floating Bar */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 52,
+          left: spacing.lg,
+          right: spacing.lg,
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 8,
-          borderWidth: 1,
-          borderColor: colors.border,
-          ...shadow.md,
-        }}>
+          gap: spacing.sm,
+        }}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: radii.full,
+            backgroundColor: colors.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: colors.borderSubtle,
+            ...shadow.sm,
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Back to list"
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text} />
+        </TouchableOpacity>
+
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.surface,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: radii.full,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            borderWidth: 1,
+            borderColor: colors.borderSubtle,
+            ...shadow.sm,
+          }}
+        >
           <Ionicons name="location-sharp" size={16} color={colors.primary} />
-          <View>
-            <Text style={{ ...typography.caption, color: colors.text, fontWeight: '700' }}>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                ...typography.caption,
+                color: colors.text,
+                fontWeight: '700',
+              }}
+              numberOfLines={1}
+            >
               {locationName || 'Live GPS'}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.textSecondary }}>
-              5 km Campus Radius • {onSiteJobs.length} gigs
+            <Text style={{ ...typography.caption, fontSize: 11, color: colors.textSecondary }}>
+              5 km radius • {onSiteJobs.length} active gigs
             </Text>
           </View>
         </View>
@@ -195,14 +249,16 @@ export default function MapScreen() {
           style={{
             width: 44,
             height: 44,
-            borderRadius: 22,
-            backgroundColor: colors.card,
+            borderRadius: radii.full,
+            backgroundColor: colors.surface,
             alignItems: 'center',
             justifyContent: 'center',
             borderWidth: 1,
-            borderColor: colors.border,
-            ...shadow.md,
+            borderColor: colors.borderSubtle,
+            ...shadow.sm,
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Re-center location"
         >
           {isLocating ? (
             <ActivityIndicator size="small" color={colors.primary} />
@@ -212,60 +268,81 @@ export default function MapScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom Selected Job Card */}
+      {/* Bottom Floating Gig Preview Card */}
       {selectedJob && (
-        <View style={{
-          position: 'absolute',
-          bottom: 24,
-          left: spacing.lg,
-          right: spacing.lg,
-          backgroundColor: colors.card,
-          borderRadius: radii.xl,
-          padding: spacing.lg,
-          borderWidth: 1,
-          borderColor: colors.border,
-          gap: spacing.sm,
-          ...shadow.lg,
-        }}>
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            left: spacing.lg,
+            right: spacing.lg,
+            backgroundColor: colors.surface,
+            borderRadius: radii.card,
+            padding: spacing.lg,
+            borderWidth: 1,
+            borderColor: colors.borderSubtle,
+            gap: spacing.sm,
+            ...shadow.md,
+          }}
+        >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              backgroundColor: selectedJob.type === 'SHORT_TERM' ? `${colors.warning}18` : `${colors.info}18`,
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: radii.full,
-            }}>
-              <Ionicons
-                name={selectedJob.type === 'SHORT_TERM' ? 'flash' : 'calendar-outline'}
-                size={12}
-                color={selectedJob.type === 'SHORT_TERM' ? colors.warning : colors.info}
+            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+              <Chip
+                size="sm"
+                label={selectedJob.type === 'SHORT_TERM' ? 'Short-term' : 'Long-term'}
+                variant={selectedJob.type === 'SHORT_TERM' ? 'warning' : 'info'}
+                icon={
+                  <Ionicons
+                    name={selectedJob.type === 'SHORT_TERM' ? 'flash' : 'calendar-outline'}
+                    size={11}
+                    color={
+                      selectedJob.type === 'SHORT_TERM'
+                        ? colors.warningText
+                        : colors.infoText
+                    }
+                  />
+                }
               />
-              <Text style={{
-                fontSize: 11,
-                fontWeight: '700',
-                color: selectedJob.type === 'SHORT_TERM' ? colors.warning : colors.info,
-              }}>
-                {selectedJob.type === 'SHORT_TERM' ? 'Short-term' : 'Long-term'}
-              </Text>
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-              <Text style={{ ...typography.caption, color: colors.textMuted }}>
+              <Text
+                style={{
+                  ...typography.caption,
+                  color: colors.textSecondary,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
                 {formatDistance(selectedJob.approximateDistance)}
               </Text>
             </View>
           </View>
 
-          <Text style={{ ...typography.headingMd, color: colors.text, fontWeight: '700' }} numberOfLines={1}>
+          <Text
+            style={{
+              ...typography.heading,
+              fontSize: 17,
+              color: colors.text,
+              fontWeight: '700',
+            }}
+            numberOfLines={1}
+          >
             {selectedJob.title}
           </Text>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
             <View>
-              <Text style={{ ...typography.headingSm, color: colors.primary, fontWeight: '800' }}>
+              <Text
+                style={{
+                  ...typography.title,
+                  fontSize: 18,
+                  lineHeight: 24,
+                  color: colors.primary,
+                  fontWeight: '700',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
                 {formatPay(selectedJob.pay, selectedJob.payUnit)}
               </Text>
               <Text style={{ ...typography.caption, color: colors.textMuted }}>
@@ -273,21 +350,13 @@ export default function MapScreen() {
               </Text>
             </View>
 
-            <TouchableOpacity
+            <Button
+              label="View Gig"
+              variant="primary"
+              size="sm"
               onPress={() => router.push(`/(app)/job/${selectedJob.id}`)}
-              style={{
-                backgroundColor: colors.primary,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: radii.md,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>View Gig</Text>
-              <Ionicons name="arrow-forward" size={15} color="#fff" />
-            </TouchableOpacity>
+              rightIcon={<Ionicons name="arrow-forward" size={14} color="#FFFFFF" />}
+            />
           </View>
         </View>
       )}

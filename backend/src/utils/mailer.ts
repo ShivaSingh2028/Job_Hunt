@@ -72,7 +72,29 @@ export async function verifyEmailProviderConnection(): Promise<{ ok: boolean; me
       console.warn(msg);
       return { ok: false, message: msg };
     }
-    const msg = '[EMAIL PROVIDER OK] Configured with Brevo HTTPS API (Port 443 - firewall safe).';
+    const senderEmail = (process.env.BREVO_SENDER || process.env.EMAIL_FROM || process.env.SMTP_USER || '').trim().toLowerCase();
+    try {
+      const sRes = await fetch('https://api.brevo.com/v3/senders', {
+        headers: { 'api-key': apiKey, 'Accept': 'application/json' },
+      });
+      if (sRes.ok) {
+        const sData: any = await sRes.json().catch(() => null);
+        const activeSenders: string[] = Array.isArray(sData?.senders)
+          ? sData.senders.filter((s: any) => s.active).map((s: any) => String(s.email || '').toLowerCase())
+          : [];
+        if (!senderEmail || !activeSenders.includes(senderEmail)) {
+          const msg = `[EMAIL PROVIDER WARNING] Brevo sender "${senderEmail || 'no-reply@jobhunt.app'}" is NOT verified/active in Brevo. Verified senders: [${activeSenders.join(', ') || 'none'}]. Emails will be rejected by Brevo relay!`;
+          console.warn(msg);
+          return { ok: false, message: msg };
+        }
+      } else {
+        const errData: any = await sRes.json().catch(() => null);
+        console.warn(`[EMAIL PROVIDER WARNING] Brevo /v3/senders check returned HTTP ${sRes.status}: ${errData?.message || 'unknown error'}`);
+      }
+    } catch {
+      // Non-fatal if offline during startup check
+    }
+    const msg = `[EMAIL PROVIDER OK] Configured with Brevo HTTPS API (sender: ${senderEmail || 'default'}, Port 443 - firewall safe).`;
     console.log(msg);
     return { ok: true, message: msg };
   }
@@ -111,7 +133,7 @@ async function sendViaResend(toEmail: string, otp: string, subject: string, html
     return { sent: false, provider: 'resend', error: errorMsg };
   }
 
-  const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'JobHunt <onboarding@resend.dev>';
+  const from = process.env.RESEND_FROM || process.env.EMAIL_FROM || process.env.SMTP_FROM || 'JobHunt <onboarding@resend.dev>';
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -154,8 +176,8 @@ async function sendViaBrevo(toEmail: string, otp: string, subject: string, htmlC
     return { sent: false, provider: 'brevo', error: errorMsg };
   }
 
-  const senderEmail = process.env.SMTP_USER || process.env.BREVO_SENDER || 'no-reply@jobhunt.app';
-  const senderName = 'JobHunt App';
+  const senderEmail = process.env.BREVO_SENDER || process.env.EMAIL_FROM || process.env.SMTP_USER || 'no-reply@jobhunt.app';
+  const senderName = process.env.EMAIL_FROM_NAME || 'JobHunt App';
 
   try {
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -178,6 +200,7 @@ async function sendViaBrevo(toEmail: string, otp: string, subject: string, htmlC
 
     if (!res.ok) {
       const err = data?.message || `Brevo API returned status ${res.status}`;
+      console.error(`[BREVO ERROR] HTTP ${res.status} (code=${data?.code || 'unknown'}): ${err}`);
       logDevOnlyOtp(toEmail, otp, err);
       return { sent: false, provider: 'brevo', error: err };
     }

@@ -1,16 +1,17 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import { Button } from './Button';
 
-interface Props {
+export interface EmptyStateProps {
   iconName?: keyof typeof Ionicons.glyphMap;
   emoji?: string;
   title: string;
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
+  style?: ViewStyle;
 }
 
 export function EmptyState({
@@ -20,26 +21,29 @@ export function EmptyState({
   description,
   actionLabel,
   onAction,
-}: Props) {
+  style,
+}: EmptyStateProps) {
   const { colors, typography, spacing, radii } = useTheme();
 
   return (
     <View
-      style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.md,
-        padding: spacing.xxl,
-        marginVertical: spacing.xl,
-      }}
+      style={[
+        {
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: spacing.xxxl,
+          paddingHorizontal: spacing.xl,
+          gap: spacing.md,
+        },
+        style,
+      ]}
     >
       <View
         style={{
-          width: 76,
-          height: 76,
+          width: 72,
+          height: 72,
           borderRadius: radii.full,
-          backgroundColor: colors.bgSecondary,
+          backgroundColor: colors.primaryBg,
           borderWidth: 1,
           borderColor: colors.border,
           alignItems: 'center',
@@ -48,43 +52,46 @@ export function EmptyState({
         }}
       >
         {iconName ? (
-          <Ionicons name={iconName} size={36} color={colors.textSecondary} />
+          <Ionicons name={iconName} size={32} color={colors.primary} />
         ) : (
-          <Text style={{ fontSize: 36 }}>{emoji}</Text>
+          <Text style={{ fontSize: 32 }}>{emoji}</Text>
         )}
       </View>
+
       <Text
         style={{
-          ...typography.headingMd,
+          ...typography.heading,
           color: colors.text,
           textAlign: 'center',
-          fontWeight: '700',
+          fontWeight: '600',
         }}
       >
         {title}
       </Text>
-      {description && (
+
+      {description ? (
         <Text
           style={{
-            ...typography.bodyMd,
+            ...typography.secondary,
             color: colors.textSecondary,
             textAlign: 'center',
-            maxWidth: 320,
-            lineHeight: 22,
+            maxWidth: 280,
+            lineHeight: 20,
           }}
         >
           {description}
         </Text>
-      )}
-      {actionLabel && onAction && (
+      ) : null}
+
+      {actionLabel && onAction ? (
         <Button
           label={actionLabel}
           onPress={onAction}
-          variant="secondary"
+          variant="primary"
           size="md"
-          style={{ marginTop: spacing.sm }}
+          style={{ marginTop: spacing.xs }}
         />
-      )}
+      ) : null}
     </View>
   );
 }

@@ -1,10 +1,11 @@
-import { Router, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { io } from '../server.js';
+import { createAsyncRouter } from '../utils/asyncHandler.js';
 
-export const chatRouter = Router();
+export const chatRouter = createAsyncRouter();
 
 // GET /api/v1/chat/conversations
 // Returns all conversations for the authenticated user

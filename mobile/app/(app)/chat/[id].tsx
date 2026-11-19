@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/hooks/useTheme';
 import { useAuthStore } from '../../../src/store/authStore';
 import { chatService, getChatSocket } from '../../../src/services';
+import { Avatar } from '../../../src/components/ui/Avatar';
+import { Badge } from '../../../src/components/ui/Badge';
 import type { ChatMessage } from '../../../src/types';
 
 export default function ChatScreen() {
@@ -30,7 +31,7 @@ export default function ChatScreen() {
   }>();
   const conversationId = params.id;
 
-  const { colors, typography, spacing, radii, shadow } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const { user } = useAuthStore();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -64,7 +65,7 @@ export default function ChatScreen() {
       if (!params.peerName) {
         try {
           const convs = await chatService.getConversations();
-          const current = convs.find(c => c.id === conversationId);
+          const current = convs.find((c) => c.id === conversationId);
           if (current && isMounted) {
             setPeerDetails({
               name: current.peer.name,
@@ -87,8 +88,8 @@ export default function ChatScreen() {
 
       const handleIncomingMessage = (newMsg: ChatMessage) => {
         if (newMsg.conversationId === conversationId) {
-          setMessages(prev => {
-            if (prev.some(m => m.id === newMsg.id)) return prev;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === newMsg.id)) return prev;
             return [...prev, newMsg];
           });
         }
@@ -117,8 +118,8 @@ export default function ChatScreen() {
 
     try {
       const newMsg = await chatService.sendMessage(conversationId, text);
-      setMessages(prev => {
-        if (prev.some(m => m.id === newMsg.id)) return prev;
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
         return [...prev, newMsg];
       });
     } catch (err: any) {
@@ -128,17 +129,6 @@ export default function ChatScreen() {
     } finally {
       setSending(false);
     }
-  };
-
-  const getInitials = (name?: string) => {
-    if (!name) return '??';
-    return name
-      .split(' ')
-      .filter(Boolean)
-      .map(n => n[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
   };
 
   const formatTime = (isoString: string) => {
@@ -153,11 +143,12 @@ export default function ChatScreen() {
   const displayName = peerDetails.name || params.peerName || 'Chat Partner';
   const displayTitle = peerDetails.jobTitle || params.jobTitle || '';
   const displayRole = peerDetails.role || params.peerRole || '';
-  const isPeerVerified = peerDetails.isVerified || params.isVerified === '1' || params.isVerified === 'true';
+  const isPeerVerified =
+    peerDetails.isVerified || params.isVerified === '1' || params.isVerified === 'true';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Header */}
       <View
@@ -167,85 +158,49 @@ export default function ChatScreen() {
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
           borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          backgroundColor: colors.card,
+          borderBottomColor: colors.borderSubtle,
+          backgroundColor: colors.surface,
           gap: spacing.sm,
         }}
       >
         <TouchableOpacity
           onPress={() => router.back()}
           style={{
-            padding: 8,
-            borderRadius: radii.md,
+            minWidth: 44,
+            minHeight: 44,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Back to messages"
         >
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
 
         {/* Peer Avatar */}
-        <View style={{ position: 'relative' }}>
-          <View
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: colors.primaryLight,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1.5,
-              borderColor: colors.primary,
-            }}
-          >
-            <Text style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>
-              {getInitials(displayName)}
-            </Text>
-          </View>
-          {isPeerVerified && (
-            <View
-              style={{
-                position: 'absolute',
-                bottom: -2,
-                right: -2,
-                backgroundColor: colors.success,
-                width: 14,
-                height: 14,
-                borderRadius: 7,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: colors.card,
-              }}
-            >
-              <Ionicons name="checkmark" size={9} color="#fff" />
-            </View>
-          )}
-        </View>
+        <Avatar name={displayName} size="sm" isVerified={isPeerVerified} />
 
         {/* Info */}
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ ...typography.headingSm, color: colors.text, fontWeight: '700' }} numberOfLines={1}>
+            <Text style={{ ...typography.heading, fontSize: 16, color: colors.text, fontWeight: '700' }} numberOfLines={1}>
               {displayName}
             </Text>
             {displayRole ? (
-              <View
-                style={{
-                  backgroundColor: `${colors.primary}15`,
-                  paddingHorizontal: 6,
-                  paddingVertical: 1,
-                  borderRadius: radii.sm,
-                }}
-              >
-                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.primary }}>
-                  {displayRole}
-                </Text>
-              </View>
+              <Badge
+                label={displayRole}
+                variant={displayRole === 'RECRUITER' ? 'warning' : 'primary'}
+                size="sm"
+              />
             ) : null}
           </View>
           {displayTitle ? (
-            <Text style={{ ...typography.caption, color: colors.textSecondary }} numberOfLines={1}>
-              💼 {displayTitle}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+              <Ionicons name="briefcase-outline" size={12} color={colors.textSecondary} />
+              <Text style={{ ...typography.caption, color: colors.textSecondary }} numberOfLines={1}>
+                {displayTitle}
+              </Text>
+            </View>
           ) : null}
         </View>
       </View>
@@ -256,16 +211,16 @@ export default function ChatScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           gap: 6,
-          backgroundColor: `${colors.primary}10`,
+          backgroundColor: colors.primaryBg,
           paddingHorizontal: spacing.md,
           paddingVertical: 6,
           borderBottomWidth: 1,
-          borderBottomColor: `${colors.primary}20`,
+          borderBottomColor: colors.borderSubtle,
         }}
       >
         <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
-        <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '600', flex: 1 }}>
-          End-to-end verified student channel for campus coordination.
+        <Text style={{ ...typography.caption, fontSize: 11, color: colors.primary, fontWeight: '600', flex: 1 }}>
+          Verified student communication channel for campus task coordination.
         </Text>
       </View>
 
@@ -283,7 +238,7 @@ export default function ChatScreen() {
           <FlatList
             ref={flatListRef}
             data={messages}
-            keyExtractor={item => item.id}
+            keyExtractor={(item) => item.id}
             contentContainerStyle={{
               padding: spacing.md,
               gap: spacing.sm,
@@ -303,15 +258,14 @@ export default function ChatScreen() {
                 >
                   <View
                     style={{
-                      backgroundColor: isMe ? colors.primary : colors.card,
-                      borderRadius: radii.lg,
-                      borderTopRightRadius: isMe ? 4 : radii.lg,
-                      borderTopLeftRadius: !isMe ? 4 : radii.lg,
+                      backgroundColor: isMe ? colors.primary : colors.surface,
+                      borderRadius: radii.md,
+                      borderTopRightRadius: isMe ? 4 : radii.md,
+                      borderTopLeftRadius: !isMe ? 4 : radii.md,
                       paddingHorizontal: spacing.md,
                       paddingVertical: 10,
                       borderWidth: isMe ? 0 : 1,
-                      borderColor: colors.border,
-                      ...shadow.sm,
+                      borderColor: colors.borderSubtle,
                     }}
                   >
                     {!isMe && (
@@ -328,8 +282,8 @@ export default function ChatScreen() {
                     )}
                     <Text
                       style={{
-                        ...typography.bodyMd,
-                        color: isMe ? '#ffffff' : colors.text,
+                        ...typography.body,
+                        color: isMe ? '#FFFFFF' : colors.text,
                         lineHeight: 20,
                       }}
                     >
@@ -346,14 +300,21 @@ export default function ChatScreen() {
                       paddingHorizontal: 4,
                     }}
                   >
-                    <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                    <Text
+                      style={{
+                        ...typography.caption,
+                        fontSize: 10,
+                        color: colors.textSecondary,
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
                       {formatTime(item.createdAt)}
                     </Text>
                     {isMe && (
                       <Ionicons
                         name={item.isRead ? 'checkmark-done' : 'checkmark'}
                         size={12}
-                        color={item.isRead ? colors.primary : colors.textMuted}
+                        color={item.isRead ? colors.primary : colors.textSecondary}
                       />
                     )}
                   </View>
@@ -362,12 +323,12 @@ export default function ChatScreen() {
             }}
             ListEmptyComponent={
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
-                <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted} />
-                <Text style={{ ...typography.headingSm, color: colors.text, textAlign: 'center' }}>
+                <Ionicons name="chatbubbles-outline" size={44} color={colors.textSecondary} />
+                <Text style={{ ...typography.heading, fontSize: 16, color: colors.text, textAlign: 'center', fontWeight: '700' }}>
                   No messages yet
                 </Text>
-                <Text style={{ ...typography.bodySm, color: colors.textSecondary, textAlign: 'center' }}>
-                  Say hello to coordinate location, timing, and details for this gig.
+                <Text style={{ ...typography.body, fontSize: 13, color: colors.textSecondary, textAlign: 'center' }}>
+                  Say hello to coordinate arrival, location, and timing for this gig.
                 </Text>
               </View>
             }
@@ -381,9 +342,9 @@ export default function ChatScreen() {
             alignItems: 'center',
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,
-            backgroundColor: colors.card,
+            backgroundColor: colors.surface,
             borderTopWidth: 1,
-            borderTopColor: colors.border,
+            borderTopColor: colors.borderSubtle,
             gap: spacing.sm,
           }}
         >
@@ -392,17 +353,17 @@ export default function ChatScreen() {
               flex: 1,
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: colors.bgSecondary,
+              backgroundColor: colors.surfaceSecondary,
               borderRadius: radii.full,
               paddingHorizontal: spacing.md,
               borderWidth: 1,
-              borderColor: colors.border,
-              minHeight: 44,
+              borderColor: colors.borderSubtle,
+              minHeight: 48,
             }}
           >
             <TextInput
               placeholder="Type a message..."
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.textSecondary}
               value={inputText}
               onChangeText={setInputText}
               multiline
@@ -421,21 +382,23 @@ export default function ChatScreen() {
             onPress={handleSend}
             disabled={!inputText.trim() || sending}
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: inputText.trim() ? colors.primary : colors.bgTertiary,
+              width: 48,
+              height: 48,
+              borderRadius: radii.full,
+              backgroundColor: inputText.trim() ? colors.primary : colors.surfaceSecondary,
               alignItems: 'center',
               justifyContent: 'center',
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
           >
             {sending ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Ionicons
                 name="send"
                 size={18}
-                color={inputText.trim() ? '#fff' : colors.textMuted}
+                color={inputText.trim() ? '#FFFFFF' : colors.textSecondary}
               />
             )}
           </TouchableOpacity>

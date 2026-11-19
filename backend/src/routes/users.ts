@@ -1,10 +1,11 @@
-import { Router, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { formatUserResponse } from './auth.js';
+import { createAsyncRouter } from '../utils/asyncHandler.js';
 
-export const usersRouter = Router();
+export const usersRouter = createAsyncRouter();
 
 // GET /api/v1/users/me
 usersRouter.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {

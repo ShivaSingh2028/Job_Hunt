@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { ActionLogType } from '@prisma/client';
 import { prisma } from '../prisma.js';
@@ -9,8 +9,9 @@ import {
   AuthRequest,
 } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { createAsyncRouter } from '../utils/asyncHandler.js';
 
-export const adminRouter = Router();
+export const adminRouter = createAsyncRouter();
 
 // Helper to log admin action
 async function logAdminAction(

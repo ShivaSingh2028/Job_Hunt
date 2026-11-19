@@ -1,9 +1,10 @@
-import { Router, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { createAsyncRouter } from '../utils/asyncHandler.js';
 
-export const reportsRouter = Router();
+export const reportsRouter = createAsyncRouter();
 
 // POST /api/v1/reports
 reportsRouter.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {

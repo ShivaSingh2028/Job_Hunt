@@ -30,9 +30,15 @@ import type {
 const DEFAULT_URL =
   Platform.OS === 'web'
     ? 'http://localhost:8080/api/v1'
-    : 'http://10.162.68.159:8080/api/v1';
+    : 'http://10.109.22.159:8080/api/v1';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_URL;
+const RAW_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_URL).trim();
+const BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
+const DEBUG_API_LOGS = false;
+
+if (DEBUG_API_LOGS) {
+  console.log('[API DEBUG] Final BASE_URL:', BASE_URL);
+}
 
 let wakingCount = 0;
 function trackServerActivity(): () => void {
@@ -86,7 +92,11 @@ async function executeRequest<T>(endpoint: string, options: RequestInit = {}, is
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  const method = (options.method || 'GET').toUpperCase();
   const url = `${BASE_URL}${endpoint}`;
+  if (DEBUG_API_LOGS) {
+    console.log(`[API DEBUG] ${method} ${url}`);
+  }
   let res: Response | null = null;
   let lastNetworkError: any = null;
 
@@ -118,7 +128,11 @@ async function executeRequest<T>(endpoint: string, options: RequestInit = {}, is
     const refreshToken = await SecureStore.getItemAsync('refreshToken').catch(() => null);
     if (refreshToken) {
       try {
-        const refreshRes = await fetchWithTimeout(`${BASE_URL}/auth/refresh`, {
+        const refreshUrl = `${BASE_URL}/auth/refresh`;
+        if (DEBUG_API_LOGS) {
+          console.log(`[API DEBUG] POST ${refreshUrl}`);
+        }
+        const refreshRes = await fetchWithTimeout(refreshUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),

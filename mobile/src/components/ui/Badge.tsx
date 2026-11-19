@@ -1,48 +1,106 @@
 import React from 'react';
-import { View, Text, ViewStyle } from 'react-native';
+import { View, Text, ViewStyle, TextStyle } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 
-type BadgeVariant = 'default' | 'success' | 'error' | 'warning' | 'info' | 'primary';
+export type BadgeVariant =
+  | 'default'
+  | 'neutral'
+  | 'primary'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'error'
+  | 'info';
 
-interface BadgeProps {
-  label: string;
+export interface BadgeProps {
+  label?: string | number;
   variant?: BadgeVariant;
+  size?: 'sm' | 'md';
+  dot?: boolean;
   style?: ViewStyle;
+  textStyle?: TextStyle;
 }
 
-export function Badge({ label, variant = 'default', style }: BadgeProps) {
-  const { colors, radii } = useTheme();
+export function Badge({
+  label,
+  variant = 'default',
+  size = 'md',
+  dot = false,
+  style,
+  textStyle,
+}: BadgeProps) {
+  const { colors, radii, typography } = useTheme();
 
-  const bgMap: Record<BadgeVariant, string> = {
-    default: colors.bgTertiary,
-    success: `${colors.success}20`,
-    error: `${colors.error}20`,
-    warning: `${colors.warning}20`,
-    info: `${colors.info}20`,
-    primary: colors.primaryLight,
+  const resolvedVariant =
+    variant === 'error' ? 'danger' : variant === 'neutral' ? 'default' : variant;
+
+  const getColors = () => {
+    switch (resolvedVariant) {
+      case 'primary':
+        return { bg: colors.primaryBg, text: colors.primary, border: colors.primaryLight };
+      case 'success':
+        return { bg: colors.successBg, text: colors.successText, border: colors.successBorder };
+      case 'warning':
+        return { bg: colors.warningBg, text: colors.warningText, border: colors.warningBorder };
+      case 'danger':
+        return { bg: colors.dangerBg, text: colors.dangerText, border: colors.dangerBorder };
+      case 'info':
+        return { bg: colors.infoBg, text: colors.infoText, border: colors.infoBorder };
+      case 'default':
+      default:
+        return { bg: colors.neutralBg, text: colors.neutralText, border: colors.neutralBorder };
+    }
   };
 
-  const textMap: Record<BadgeVariant, string> = {
-    default: colors.textSecondary,
-    success: colors.success,
-    error: colors.error,
-    warning: colors.warning,
-    info: colors.info,
-    primary: colors.primary,
-  };
+  const scheme = getColors();
+
+  if (dot) {
+    return (
+      <View
+        style={[
+          {
+            width: 8,
+            height: 8,
+            borderRadius: radii.full,
+            backgroundColor: scheme.text,
+          },
+          style,
+        ]}
+      />
+    );
+  }
 
   return (
-    <View style={[
-      {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: radii.full,
-        backgroundColor: bgMap[variant],
-        alignSelf: 'flex-start',
-      },
-      style,
-    ]}>
-      <Text style={{ fontSize: 11, fontWeight: '600', color: textMap[variant] }}>{label}</Text>
+    <View
+      style={[
+        {
+          paddingHorizontal: size === 'sm' ? 6 : 8,
+          paddingVertical: size === 'sm' ? 1.5 : 3,
+          borderRadius: radii.badge,
+          backgroundColor: scheme.bg,
+          borderWidth: 1,
+          borderColor: scheme.border,
+          alignSelf: 'flex-start',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        style,
+      ]}
+    >
+      <Text
+        style={[
+          {
+            ...typography.caption,
+            fontSize: 11,
+            fontWeight: '600',
+            color: scheme.text,
+            fontVariant: ['tabular-nums'],
+          },
+          textStyle,
+        ]}
+      >
+        {label}
+      </Text>
     </View>
   );
 }

@@ -1,9 +1,10 @@
-import { Router, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../prisma.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { sendSuccess } from '../utils/response.js';
+import { createAsyncRouter } from '../utils/asyncHandler.js';
 
-export const notificationsRouter = Router();
+export const notificationsRouter = createAsyncRouter();
 
 // GET /api/v1/notifications
 notificationsRouter.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {

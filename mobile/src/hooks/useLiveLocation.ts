@@ -16,13 +16,26 @@ export interface LiveLocationState {
 let _cachedCoords: { lat: number; lng: number } | null = null;
 let _cachedLabel: string | null = null;
 
+export function cleanReadableLocation(raw?: string | null): string {
+  if (!raw) return 'Current location';
+  // Strip plus codes like "GQ87+2CJ, Ayodhya Division" -> "Ayodhya Division"
+  const segments = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => !s.includes('+') && !/^[A-Z0-9]{4,8}\+/i.test(s));
+
+  const result = segments.join(', ').trim();
+  return result || 'Current location';
+}
+
 export function useLiveLocation(): LiveLocationState {
   const { user } = useAuthStore();
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    _cachedCoords || (user?.location ? { lat: user.location.lat, lng: user.location.lng } : null)
-  );
+  const initialCoords =
+    _cachedCoords || (user?.location ? { lat: user.location.lat, lng: user.location.lng } : null);
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(initialCoords);
   const [locationName, setLocationName] = useState<string>(
-    _cachedLabel || user?.location?.label || 'Detecting live location...'
+    cleanReadableLocation(_cachedLabel || user?.location?.label)
   );
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
@@ -39,7 +52,7 @@ export function useLiveLocation(): LiveLocationState {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setPermissionGranted(false);
-        setErrorMsg('Location permission denied. Using default campus location.');
+        setErrorMsg('Location permission denied. Using campus location.');
         setIsLocating(false);
         isFetchingRef.current = false;
         return;
@@ -58,7 +71,7 @@ export function useLiveLocation(): LiveLocationState {
       setCoords({ lat: newLat, lng: newLng });
 
       // Reverse geocode to get human-friendly neighborhood/city name
-      let addressLabel = _cachedLabel || 'Current Location';
+      let addressLabel = cleanReadableLocation(_cachedLabel) || 'Current location';
       try {
         const geo = await Location.reverseGeocodeAsync({
           latitude: newLat,
@@ -66,17 +79,30 @@ export function useLiveLocation(): LiveLocationState {
         });
         if (geo && geo.length > 0) {
           const place = geo[0];
+          const isPlus = (s?: string | null) =>
+            !s || s.includes('+') || /^[A-Z0-9]{4,8}\+/i.test(s);
+
+          const streetOrArea = !isPlus(place.name)
+            ? place.name
+            : !isPlus(place.street)
+            ? place.street
+            : null;
+          const districtOrCity = place.district || place.subregion || place.city;
+          const region = place.region;
+
           const parts = [
-            place.name || place.street,
-            place.district || place.subregion,
-            place.city,
+            streetOrArea,
+            districtOrCity,
+            !districtOrCity ? region : null,
           ].filter(Boolean);
-          addressLabel = parts.slice(0, 2).join(', ') || place.city || 'Campus Area';
+
+          addressLabel = parts.join(', ') || place.city || place.region || 'Current location';
         }
       } catch {
         // Fallback gracefully
       }
 
+      addressLabel = cleanReadableLocation(addressLabel);
       _cachedLabel = addressLabel;
       setLocationName(addressLabel);
 

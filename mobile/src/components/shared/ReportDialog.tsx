@@ -3,7 +3,8 @@ import { Modal, View, Text, TouchableOpacity, Alert, ScrollView } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { TextField } from '../ui/TextField';
+import { Card } from '../ui/Card';
 import { reportService } from '../../services';
 import type { ReportReason } from '../../types';
 
@@ -42,9 +43,11 @@ export function ReportDialog({ visible, onClose, targetType, targetId, targetTit
         reason,
         description: description.trim(),
       });
-      Alert.alert('Report Submitted', 'Thank you for reporting. Our Trust & Safety team will review the issue promptly.', [
-        { text: 'OK', onPress: onClose },
-      ]);
+      Alert.alert(
+        'Report Submitted',
+        'Thank you for reporting. Campus Trust & Safety will review this report promptly.',
+        [{ text: 'OK', onPress: onClose }]
+      );
       setDescription('');
     } catch (e: any) {
       Alert.alert('Submission Error', e?.message || 'Could not submit report.');
@@ -55,98 +58,127 @@ export function ReportDialog({ visible, onClose, targetType, targetId, targetTit
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: spacing.lg }}>
-        <View style={{
-          backgroundColor: colors.card,
-          borderRadius: radii.xl,
-          padding: spacing.xl,
-          gap: spacing.md,
-          maxHeight: '85%',
-          borderWidth: 1,
-          borderColor: colors.border,
-          ...shadow.lg,
-        }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          justifyContent: 'center',
+          padding: spacing.lg,
+        }}
+      >
+        <Card
+          variant="elevated"
+          style={{
+            padding: spacing.xl,
+            gap: spacing.md,
+            maxHeight: '85%',
+          }}
+        >
           {/* Header */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="flag-outline" size={20} color={colors.error} />
-              <Text style={{ ...typography.headingMd, color: colors.text, fontWeight: '700' }}>
-                Report {targetType === 'JOB' ? 'Listing' : 'Account'}
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: radii.full,
+                  backgroundColor: colors.dangerBg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons name="flag" size={18} color={colors.dangerText} />
+              </View>
+              <Text style={{ ...typography.heading, fontSize: 18, color: colors.text, fontWeight: '700' }}>
+                Report {targetType === 'JOB' ? 'Gig Listing' : 'Student'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-              <Ionicons name="close" size={20} color={colors.textMuted} />
+            <TouchableOpacity
+              onPress={onClose}
+              style={{ padding: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+              accessibilityRole="button"
+              accessibilityLabel="Close report dialog"
+            >
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {targetTitle && (
-            <Text style={{ ...typography.bodySm, color: colors.textSecondary }} numberOfLines={1}>
+            <Text style={{ ...typography.caption, color: colors.textSecondary }} numberOfLines={1}>
               Regarding: <Text style={{ color: colors.text, fontWeight: '600' }}>"{targetTitle}"</Text>
             </Text>
           )}
 
-          <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
-            <Text style={{ ...typography.label, color: colors.textSecondary, marginBottom: 8, letterSpacing: 0.3 }}>
-              REASON FOR REPORTING
+          <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+            <Text style={{ ...typography.caption, color: colors.textSecondary, marginBottom: 8, fontWeight: '600' }}>
+              REASON FOR REPORT
             </Text>
             <View style={{ gap: 8, marginBottom: spacing.md }}>
-              {REASONS.map(r => {
+              {REASONS.map((r) => {
                 const isSelected = reason === r.value;
                 return (
                   <TouchableOpacity
                     key={r.value}
                     onPress={() => setReason(r.value)}
+                    activeOpacity={0.8}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: spacing.md,
                       borderRadius: radii.md,
-                      backgroundColor: isSelected ? colors.primaryLight : colors.bgSecondary,
+                      backgroundColor: isSelected ? colors.primaryBg : colors.surfaceSecondary,
                       borderWidth: 1.5,
-                      borderColor: isSelected ? colors.primary : 'transparent',
+                      borderColor: isSelected ? colors.primary : colors.borderSubtle,
                     }}
                   >
-                    <Text style={{
-                      ...typography.bodyMd,
-                      color: isSelected ? colors.primary : colors.text,
-                      fontWeight: isSelected ? '700' : '500',
-                    }}>
+                    <Text
+                      style={{
+                        ...typography.body,
+                        fontSize: 14,
+                        color: isSelected ? colors.primary : colors.text,
+                        fontWeight: isSelected ? '700' : '500',
+                      }}
+                    >
                       {r.label}
                     </Text>
-                    {isSelected && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+                    {isSelected && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <Input
-              label="Incident Description *"
-              placeholder="Describe what occurred with specific details..."
+            <TextField
+              label="Incident Description"
+              placeholder="Provide specific details about what occurred..."
               value={description}
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
-              style={{ minHeight: 70, textAlignVertical: 'top' }}
+              helperText="Reports are strictly confidential and reviewed by platform administrators."
             />
           </ScrollView>
 
           <View style={{ gap: spacing.xs, marginTop: spacing.xs }}>
             <Button
-              label="Submit Report"
+              label="Submit Confidential Report"
               onPress={handleSubmit}
               loading={loading}
-              variant="danger"
+              variant="destructive"
+              size="lg"
               fullWidth
             />
             <Button
               label="Cancel"
               onPress={onClose}
               variant="ghost"
+              size="md"
               fullWidth
             />
           </View>
-        </View>
+        </Card>
       </View>
     </Modal>
   );
