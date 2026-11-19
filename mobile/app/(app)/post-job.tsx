@@ -92,8 +92,8 @@ export default function PostJobScreen() {
               if (emailToVerify) {
                 await authService.resendVerification(emailToVerify);
               }
-            } catch (err: any) {
-              console.log('[POST-JOB] Resend verification triggered:', err?.message);
+            } catch {
+              // Ignore resend error and continue to OTP screen
             }
             router.push({
               pathname: '/(auth)/verify-otp',
