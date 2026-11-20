@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,22 +16,8 @@ import { useAuthStore } from '../src/store/authStore';
 import { loadSession } from '../src/services/session';
 import { userService } from '../src/services';
 
-// Ensure default typography is Inter across all unstyled Text and TextInput
-if ((Text as any).defaultProps == null) {
-  (Text as any).defaultProps = {};
-}
-(Text as any).defaultProps.style = {
-  fontFamily: 'Inter_400Regular',
-};
-
-if ((TextInput as any).defaultProps == null) {
-  (TextInput as any).defaultProps = {};
-}
-(TextInput as any).defaultProps.style = {
-  fontFamily: 'Inter_400Regular',
-};
-
-SplashScreen.preventAutoHideAsync();
+// Catch any splash-screen promise rejections during cold boot
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const { setAuth, clearAuth } = useAuthStore();
@@ -107,6 +93,11 @@ export default function RootLayout() {
 
     return () => clearTimeout(safetyTimer);
   }, [fontsLoaded, fontError, sessionLoaded]);
+
+  // Keep native splash screen visible until fonts and basic session are ready
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
