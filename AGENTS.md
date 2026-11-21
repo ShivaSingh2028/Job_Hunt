@@ -148,6 +148,7 @@ For comprehensive payload definitions and response schemas, refer to [API_CONTRA
   * `SplashScreen.preventAutoHideAsync().catch(() => {})` must catch rejections.
   * Root layout must guard rendering with `if (!fontsLoaded && !fontError) return null;` to prevent rendering un-cached typefaces before Inter finishes loading.
   * `app.json` must not contain the legacy root `"splash"` property; splash screen is configured via the `expo-splash-screen` plugin.
+  * Release/preview APK builds enable R8 code shrinking by default. Jetpack WorkManager (`androidx.work`, pulled in by `react-native-maps`) crashes on startup with `Failed to create an instance of class androidx.work.impl.WorkDatabase` if reflection constructors are stripped. Always maintain `expo-build-properties` in `app.json` with `enableMinifyInReleaseBuilds: false` and ProGuard keep rules for `androidx.work.**` and `androidx.room.**`.
 
 ---
 *Reference documentation: [API_CONTRACT.md](file:///C:/Users/Shiva%20Singh/OneDrive/Desktop/Job_Hunt/docs/API_CONTRACT.md) | [BACKEND_HANDOFF.md](file:///C:/Users/Shiva%20Singh/OneDrive/Desktop/Job_Hunt/docs/BACKEND_HANDOFF.md)*
