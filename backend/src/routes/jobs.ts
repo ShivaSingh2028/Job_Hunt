@@ -268,9 +268,13 @@ jobsRouter.get('/:id', optionalAuthenticate, async (req: AuthRequest, res: Respo
 // POST /api/v1/jobs
 jobsRouter.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   const user = req.user!;
+  const now = new Date();
+  const isBlocked = Boolean(user.blockedUntil && now < new Date(user.blockedUntil));
 
-  if (user.isBlocked) {
-    return sendError(res, 'USER_BLOCKED', 'Your account is currently blocked.', 403);
+  if (isBlocked) {
+    return sendError(res, 'USER_BLOCKED', 'Your account is currently blocked.', 403, {
+      blockedUntil: user.blockedUntil ? new Date(user.blockedUntil).toISOString() : null,
+    });
   }
 
   if (user.isVerified === false) {
@@ -358,9 +362,13 @@ jobsRouter.post('/', authenticateToken, async (req: AuthRequest, res: Response) 
 // POST /api/v1/jobs/:id/accept
 jobsRouter.post('/:id/accept', authenticateToken, async (req: AuthRequest, res: Response) => {
   const user = req.user!;
+  const now = new Date();
+  const isBlocked = Boolean(user.blockedUntil && now < new Date(user.blockedUntil));
 
-  if (user.isBlocked) {
-    return sendError(res, 'USER_BLOCKED', 'Your account is blocked.', 403);
+  if (isBlocked) {
+    return sendError(res, 'USER_BLOCKED', 'Your account is currently blocked.', 403, {
+      blockedUntil: user.blockedUntil ? new Date(user.blockedUntil).toISOString() : null,
+    });
   }
 
   if (user.isVerified === false) {
@@ -379,7 +387,8 @@ jobsRouter.post('/:id/accept', authenticateToken, async (req: AuthRequest, res: 
   const { id } = req.params;
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(
+      async (tx) => {
       const job = await tx.job.findUnique({
         where: { id },
         include: { poster: true },
@@ -526,7 +535,7 @@ jobsRouter.post('/:id/accept', authenticateToken, async (req: AuthRequest, res: 
         status: 'ACCEPTED',
         job: updatedJob,
       };
-    });
+    }, { timeout: 15000, maxWait: 5000 });
 
     const formattedJob = await formatJob(result.job, user.id);
     return sendSuccess(res, {
@@ -654,6 +663,11 @@ jobsRouter.delete('/:id', authenticateToken, async (req: AuthRequest, res: Respo
 
   const job = await prisma.job.findUnique({
     where: { id },
+    include: {
+      applications: {
+        where: { status: { in: ['ACCEPTED', 'IN_PROGRESS'] } },
+      },
+    },
   });
 
   if (!job) {
@@ -664,29 +678,83 @@ jobsRouter.delete('/:id', authenticateToken, async (req: AuthRequest, res: Respo
     return sendError(res, 'FORBIDDEN', 'You can only cancel your own job.', 403);
   }
 
-  await prisma.job.update({
-    where: { id },
-    data: { status: 'CANCELLED' },
+  const hadAcceptedSeekers = job.applications.length > 0;
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.job.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+      });
+
+      if (hadAcceptedSeekers) {
+        // Record in the same application cancellation history used for seekers
+        await tx.application.updateMany({
+          where: {
+            jobId: id,
+            status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+          },
+          data: {
+            status: 'CANCELLED',
+            cancelledAt: new Date(),
+          },
+        });
+
+        // Notify every accepted seeker
+        for (const app of job.applications) {
+          await tx.notification.create({
+            data: {
+              userId: app.seekerId,
+              type: 'RECRUITER_CANCELLED',
+              title: 'Job Cancelled',
+              body: `The poster cancelled the gig "${job.title}".`,
+              relatedJobId: id,
+            },
+          });
+        }
+
+        // Add ONE strike to recruiter's cancellationCount and apply 3-strike rule
+        const recruiter = await tx.user.findUnique({
+          where: { id: req.user!.id },
+        });
+
+        const newCount = (recruiter?.cancellationCount || 0) + 1;
+        if (newCount >= 3) {
+          const blockExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          await tx.user.update({
+            where: { id: req.user!.id },
+            data: {
+              cancellationCount: 0,
+              isBlocked: true,
+              blockedUntil: blockExpiry,
+            },
+          });
+
+          await tx.notification.create({
+            data: {
+              userId: req.user!.id,
+              type: 'BLOCKED',
+              title: 'Account Temporarily Blocked',
+              body: 'Your account is blocked for 24 hours due to 3 cancellations.',
+            },
+          });
+        } else {
+          await tx.user.update({
+            where: { id: req.user!.id },
+            data: {
+              cancellationCount: newCount,
+            },
+          });
+        }
+      }
+    },
+    { timeout: 15000, maxWait: 5000 }
+  );
+
+  return sendSuccess(res, {
+    message: 'Job cancelled successfully.',
+    cancellationPenalty: hadAcceptedSeekers,
   });
-
-  // Notify any seekers who had accepted
-  const acceptedApps = await prisma.application.findMany({
-    where: { jobId: id, status: 'ACCEPTED' },
-  });
-
-  for (const app of acceptedApps) {
-    await prisma.notification.create({
-      data: {
-        userId: app.seekerId,
-        type: 'RECRUITER_CANCELLED',
-        title: 'Job Cancelled',
-        body: `The poster cancelled the gig "${job.title}".`,
-        relatedJobId: id,
-      },
-    });
-  }
-
-  return sendSuccess(res, { message: 'Job cancelled successfully.' });
 });
 
 // POST /api/v1/jobs/:id/save

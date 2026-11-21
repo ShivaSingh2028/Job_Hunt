@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
-import { blockTimeRemaining } from '../../utils/businessRules';
 
 interface Props {
   blockedUntil: string | null;
@@ -10,7 +9,24 @@ interface Props {
 
 export function BlockedBanner({ blockedUntil }: Props) {
   const { colors, spacing, typography, radii } = useTheme();
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!blockedUntil) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [blockedUntil]);
+
   if (!blockedUntil) return null;
+  const expiry = new Date(blockedUntil).getTime();
+  if (expiry <= now) return null;
+
+  const formattedTime = new Date(blockedUntil).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
   return (
     <View
@@ -40,11 +56,8 @@ export function BlockedBanner({ blockedUntil }: Props) {
         <Ionicons name="lock-closed" size={18} color="#FFFFFF" />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ ...typography.heading, fontSize: 14, color: colors.dangerText, fontWeight: '700' }}>
-          Account Restricted for 24 Hours
-        </Text>
-        <Text style={{ ...typography.caption, color: colors.dangerText, marginTop: 2, lineHeight: 16 }}>
-          Action locked due to repeated cancellations. Access automatically restores in {blockTimeRemaining(blockedUntil)}.
+        <Text style={{ ...typography.caption, color: colors.dangerText, fontWeight: '600', lineHeight: 18 }}>
+          You are blocked until {formattedTime}. You can view gigs but cannot accept or post.
         </Text>
       </View>
     </View>

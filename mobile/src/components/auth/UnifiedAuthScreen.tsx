@@ -249,11 +249,6 @@ export function UnifiedAuthScreen({ initialTab = 'login' }: Props) {
         setLoginErrors({ password: 'Incorrect password. Please try again.' });
       } else if (code === 'NOT_FOUND' && !err?.message?.toLowerCase().includes('endpoint')) {
         setLoginErrors({ email: 'No account found for this email address.' });
-      } else if (code === 'USER_BLOCKED') {
-        setBannerError({
-          variant: 'danger',
-          message: err.message || 'Your account is temporarily restricted.',
-        });
       } else if (
         err?.status === 429 ||
         code === 'TOO_MANY_REQUESTS' ||

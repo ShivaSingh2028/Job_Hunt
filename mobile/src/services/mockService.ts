@@ -33,7 +33,12 @@ export const mockAuthService: IAuthService = {
     if (!_user.isVerified && email === _user.email) {
       err('EMAIL_NOT_VERIFIED', 'Please verify your email address before logging in.');
     }
-    return { user: _user, accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' };
+    if (_user.blockedUntil && new Date(_user.blockedUntil).getTime() <= Date.now()) {
+      _user = { ..._user, isBlocked: false, blockedUntil: null, cancellationCount: 0 };
+    } else if (_user.blockedUntil) {
+      _user = { ..._user, isBlocked: true };
+    }
+    return { user: { ..._user, savedJobIds: _savedJobIds }, accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' };
   },
   async signup(name, email, _password, phone): Promise<SignupResponse> {
     await delay(600);
@@ -106,7 +111,15 @@ export const mockAuthService: IAuthService = {
 };
 
 export const mockUserService: IUserService = {
-  async getMe() { await delay(400); return { ..._user, savedJobIds: _savedJobIds }; },
+  async getMe() {
+    await delay(400);
+    if (_user.blockedUntil && new Date(_user.blockedUntil).getTime() <= Date.now()) {
+      _user = { ..._user, isBlocked: false, blockedUntil: null, cancellationCount: 0 };
+    } else if (_user.blockedUntil) {
+      _user = { ..._user, isBlocked: true };
+    }
+    return { ..._user, savedJobIds: _savedJobIds };
+  },
   async updateMe(data) {
     await delay(600);
     _user = { ..._user, ...data } as User;
@@ -176,7 +189,13 @@ export const mockJobService: IJobService = {
   },
   async acceptJob(id) {
     await delay(800);
-    if (_user.isBlocked) err('USER_BLOCKED', 'Your account is blocked.');
+    const isBlocked = Boolean(_user.blockedUntil && new Date(_user.blockedUntil).getTime() > Date.now());
+    if (isBlocked) {
+      const e = new Error('Your account is currently blocked.') as any;
+      e.code = 'USER_BLOCKED';
+      e.blockedUntil = _user.blockedUntil;
+      throw e;
+    }
     if (_user.activeMode !== 'SEEKER') err('FORBIDDEN', 'Switch to Seeker mode first.');
     const job = _jobs.find(j => j.id === id);
     if (!job) err('NOT_FOUND', 'Job not found.');
@@ -225,7 +244,13 @@ export const mockJobService: IJobService = {
   },
   async createJob(payload) {
     await delay(900);
-    if (_user.isBlocked) err('USER_BLOCKED', 'Your account is blocked.');
+    const isBlocked = Boolean(_user.blockedUntil && new Date(_user.blockedUntil).getTime() > Date.now());
+    if (isBlocked) {
+      const e = new Error('Your account is currently blocked.') as any;
+      e.code = 'USER_BLOCKED';
+      e.blockedUntil = _user.blockedUntil;
+      throw e;
+    }
     if (_user.activeMode !== 'RECRUITER') err('FORBIDDEN', 'Switch to Recruiter mode first.');
     const newJob: Job = {
       id: `job-${Date.now()}`,
@@ -254,8 +279,47 @@ export const mockJobService: IJobService = {
     _jobs[idx] = { ..._jobs[idx], status: 'CANCELLED' };
     const pidx = _posts.findIndex(p => p.id === id);
     if (pidx !== -1) _posts[pidx] = { ..._posts[pidx], status: 'CANCELLED' };
+
     if (hadAccepted) {
-      _user = { ..._user, cancellationCount: _user.cancellationCount + 1 };
+      const acceptedApps = _applications.filter(a => a.job.id === id && a.status === 'ACCEPTED');
+      for (const app of acceptedApps) {
+        app.status = 'CANCELLED';
+        app.cancelledAt = new Date().toISOString();
+        _notifications.unshift({
+          id: `notif-${Date.now()}-${Math.random()}`,
+          type: 'RECRUITER_CANCELLED',
+          title: 'Job Cancelled',
+          body: `The poster cancelled the gig "${_jobs[idx].title}".`,
+          isRead: false,
+          relatedJobId: id,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      const newCount = _user.cancellationCount + 1;
+      if (newCount >= 3) {
+        const blockExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        _user = {
+          ..._user,
+          cancellationCount: 0,
+          isBlocked: true,
+          blockedUntil: blockExpiry,
+        };
+        _notifications.unshift({
+          id: `notif-${Date.now()}`,
+          type: 'BLOCKED',
+          title: 'Account Temporarily Blocked',
+          body: 'Your account is blocked for 24 hours due to 3 cancellations.',
+          isRead: false,
+          relatedJobId: null,
+          createdAt: new Date().toISOString(),
+        });
+      } else {
+        _user = {
+          ..._user,
+          cancellationCount: newCount,
+        };
+      }
     }
   },
   async saveJob(id) {

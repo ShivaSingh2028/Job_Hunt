@@ -121,6 +121,24 @@ export async function authenticateToken(
       return sendError(res, 'UNAUTHORIZED', 'User not found.', 401);
     }
 
+    const now = new Date();
+    let isCurrentlyBlocked = Boolean(user.blockedUntil && now < user.blockedUntil);
+
+    if (user.blockedUntil && now >= user.blockedUntil) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isBlocked: false,
+          blockedUntil: null,
+          cancellationCount: 0,
+        },
+      });
+      user.isBlocked = false;
+      user.blockedUntil = null;
+      user.cancellationCount = 0;
+      isCurrentlyBlocked = false;
+    }
+
     req.user = {
       id: user.id,
       email: user.email,
@@ -128,8 +146,8 @@ export async function authenticateToken(
       role: 'USER',
       activeMode: user.activeMode,
       isVerified: user.isVerified,
-      isBlocked: user.isBlocked,
-      blockedUntil: user.blockedUntil,
+      isBlocked: isCurrentlyBlocked,
+      blockedUntil: isCurrentlyBlocked ? user.blockedUntil : null,
     };
 
     next();
@@ -160,6 +178,24 @@ export async function optionalAuthenticate(
     });
 
     if (user) {
+      const now = new Date();
+      let isCurrentlyBlocked = Boolean(user.blockedUntil && now < user.blockedUntil);
+
+      if (user.blockedUntil && now >= user.blockedUntil) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            isBlocked: false,
+            blockedUntil: null,
+            cancellationCount: 0,
+          },
+        });
+        user.isBlocked = false;
+        user.blockedUntil = null;
+        user.cancellationCount = 0;
+        isCurrentlyBlocked = false;
+      }
+
       req.user = {
         id: user.id,
         email: user.email,
@@ -167,8 +203,8 @@ export async function optionalAuthenticate(
         role: 'USER',
         activeMode: user.activeMode,
         isVerified: user.isVerified,
-        isBlocked: user.isBlocked,
-        blockedUntil: user.blockedUntil,
+        isBlocked: isCurrentlyBlocked,
+        blockedUntil: isCurrentlyBlocked ? user.blockedUntil : null,
       };
     }
   } catch {}

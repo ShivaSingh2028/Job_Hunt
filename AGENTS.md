@@ -81,7 +81,7 @@ Job_Hunt/
 
 ---
 
-## 4. Product & Business Logic Rules (Verified Against Real Backend)
+## 4. Product & Business Logic Rules
 
 1. **Two Job Classifications:**
    * **Short-Term Gigs:** Quick single-session tasks, maximum duration of **5 hours**, same-day or immediate dispatch.
@@ -100,22 +100,19 @@ Job_Hunt/
      * `MODE_LOCK_RECRUITER`: If switching to Seeker while holding active job postings (`OPEN`, `FILLED`), returns HTTP 409 with `pendingItems` array.
      * `MODE_LOCK_SEEKER`: If switching to Recruiter while holding active accepted gigs (`ACCEPTED`, `IN_PROGRESS`), returns HTTP 409 with `pendingItems` array.
 6. **Cancellation & Slot Reopening Rules:**
-   * **Seeker Cancellation (`POST /api/v1/jobs/:id/cancel-acceptance`):** Decrements `filledCount`, reopens the job status to `OPEN`, notifies the recruiter (`SEEKER_CANCELLED`), and increments the seeker's `cancellationCount` by 1.
-   * **Recruiter Cancellation (`DELETE /api/v1/jobs/:id`):** Sets job status to `CANCELLED`, cancels accepted applications, and notifies all accepted seekers (`RECRUITER_CANCELLED`). Recruiter cancellation does **not** increment strike count.
+   * **Seeker Cancellation (`POST /api/v1/jobs/:id/cancel-acceptance`):** Decrements `filledCount`, reopens the job status to `OPEN`, notifies the recruiter (`SEEKER_CANCELLED`), and adds 1 strike to the seeker's `cancellationCount`.
+   * **Recruiter Cancellation (`DELETE /api/v1/jobs/:id`):** Sets job status to `CANCELLED`, cancels accepted applications (`cancelledAt` recorded), and notifies all accepted seekers (`RECRUITER_CANCELLED`). If the gig had at least one accepted seeker, 1 cancellation strike is added to the recruiter; cancelling an open gig without accepted seekers carries no strike.
 7. **Reliability Strikes & Temporary Suspension:**
-   * The **3rd seeker cancellation strike** automatically blocks the account for 24 hours (`isBlocked: true`, `blockedUntil: Date.now() + 24h`), resets `cancellationCount` to 0, and sends a `BLOCKED` notification.
-   * While blocked, accepting gigs and posting gigs return HTTP 403 with code `USER_BLOCKED`.
-   * Once the 24-hour window expires, logging in (`POST /api/v1/auth/login`) automatically unblocks the account (`isBlocked: false`, `blockedUntil: null`, `cancellationCount: 0`) and allows accepting and posting again without admin intervention.
+   * On the **3rd cancellation strike** (seeker or recruiter), the account is automatically suspended for 24 hours (`blockedUntil: Date.now() + 24h`), `cancellationCount` resets to 0, and a `BLOCKED` notification is created.
+   * Block status is determined dynamically by comparing `blockedUntil` with the current time.
+   * Blocked users can log in normally (HTTP 200) and browse gigs, chats, profile, and notifications, but attempting to accept a gig (`POST /jobs/:id/accept`) or post a gig (`POST /jobs`) returns HTTP 403 `USER_BLOCKED` containing `blockedUntil`.
+   * Once `blockedUntil` passes, the user is unblocked automatically without requiring administrator assistance.
 8. **Time-Conflict Prevention:**
    * A seeker cannot accept two short-term gigs with overlapping scheduled times on the same date. Returns HTTP 409 with code `TIME_CONFLICT`.
 9. **Administration & Moderation:**
    * An **Admin role** exists alongside dispute **reports** (`/reports`) and an **admin action log** (`/admin/actions`) for platform auditability and moderation overrides.
 10. **Payment Handling:**
     * Monetary transactions are out of scope for the app runtime; settlement is direct peer-to-peer upon task completion.
-
-### Differences Between Intended Rules and Real Implementation:
-* **Recruiter Cancellation Strike:** The intended rule considered recruiter strikes when cancelling gigs with accepted seekers. In the real implementation (`DELETE /api/v1/jobs/:id`), seekers are notified with `RECRUITER_CANCELLED`, but **no strike count is added to the recruiter**. Strikes are only applied to seekers calling `POST /api/v1/jobs/:id/cancel-acceptance`.
-* **Blocked User Login:** The intended rule stated "a blocked user can log in (200) and view gigs". In the real implementation (`POST /api/v1/auth/login`), active blocks return **HTTP 403 `USER_BLOCKED`**, preventing login entirely until the block duration expires. Existing pre-authenticated sessions can still call `GET /api/v1/jobs` (HTTP 200), but `POST /jobs` and `POST /jobs/:id/accept` are rejected with HTTP 403 `USER_BLOCKED`.
 
 For comprehensive payload definitions and response schemas, refer to [API_CONTRACT.md](file:///C:/Users/Shiva%20Singh/OneDrive/Desktop/Job_Hunt/docs/API_CONTRACT.md).
 

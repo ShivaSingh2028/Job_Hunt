@@ -50,6 +50,24 @@ export async function formatUserResponse(userId: string) {
 
   if (!user) return null;
 
+  const now = new Date();
+  let isCurrentlyBlocked = Boolean(user.blockedUntil && now < user.blockedUntil);
+
+  if (user.blockedUntil && now >= user.blockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isBlocked: false,
+        blockedUntil: null,
+        cancellationCount: 0,
+      },
+    });
+    user.isBlocked = false;
+    user.blockedUntil = null;
+    user.cancellationCount = 0;
+    isCurrentlyBlocked = false;
+  }
+
   return {
     id: user.id,
     name: user.name,
@@ -59,8 +77,8 @@ export async function formatUserResponse(userId: string) {
     activeMode: user.activeMode,
     isVerified: user.isVerified,
     cancellationCount: user.cancellationCount,
-    isBlocked: user.isBlocked,
-    blockedUntil: user.blockedUntil ? user.blockedUntil.toISOString() : null,
+    isBlocked: isCurrentlyBlocked,
+    blockedUntil: isCurrentlyBlocked && user.blockedUntil ? user.blockedUntil.toISOString() : null,
     savedJobIds: user.savedJobs.map((s) => s.jobId),
     location:
       user.locationLat !== null && user.locationLng !== null
@@ -154,24 +172,15 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   }
 
   // Check auto-unblock if block expired
-  if (user.isBlocked) {
-    if (user.blockedUntil && new Date() > user.blockedUntil) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          isBlocked: false,
-          blockedUntil: null,
-          cancellationCount: 0,
-        },
-      });
-    } else {
-      return sendError(
-        res,
-        'USER_BLOCKED',
-        'Your account is temporarily blocked due to 3 cancellations.',
-        403
-      );
-    }
+  if (user.blockedUntil && new Date() >= user.blockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isBlocked: false,
+        blockedUntil: null,
+        cancellationCount: 0,
+      },
+    });
   }
 
   const tokens = generateTokens(user.id, user.email, 'USER');

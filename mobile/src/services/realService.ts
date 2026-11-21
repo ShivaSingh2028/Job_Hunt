@@ -178,6 +178,7 @@ async function executeRequest<T>(endpoint: string, options: RequestInit = {}, is
     error.attemptsLeft = errorInfo.attemptsLeft;
     error.retryAfterSeconds = errorInfo.retryAfterSeconds;
     error.pendingItems = errorInfo.pendingItems;
+    error.blockedUntil = errorInfo.blockedUntil;
     throw error;
   }
 

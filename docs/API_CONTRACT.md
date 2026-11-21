@@ -41,7 +41,7 @@ or on failure:
 | `NOT_FOUND` | 404 | Resource not found |
 | `VALIDATION_ERROR` | 422 | Request body invalid |
 | `SERVER_ERROR` | 500 | Internal server error |
-| `USER_BLOCKED` | 403 | User is currently blocked |
+| `USER_BLOCKED` | 403 | User is currently blocked (error object includes `blockedUntil`) |
 | `CONFLICT` | 409 | Duplicate / already-taken resource |
 
 ---
@@ -156,14 +156,13 @@ Legacy/direct register endpoint (creates account and returns tokens).
 ```json
 { "email": "string", "password": "string" }
 ```
-**Response `200`:** Same shape as register response.
+**Response `200`:** Same shape as register response (Note: blocked users log in normally with `200 OK`; the `user` object returns `isBlocked: true` and `blockedUntil` timestamp).
 
 **Errors:**
 - `400 VALIDATION_ERROR`
 - `404 NOT_FOUND` (user not found)
 - `401 UNAUTHORIZED` (wrong password)
 - `403 EMAIL_NOT_VERIFIED` (email not yet verified; app must navigate to OTP screen and resend code)
-- `403 USER_BLOCKED`
 
 ---
 

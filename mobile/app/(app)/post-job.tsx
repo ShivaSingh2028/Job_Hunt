@@ -45,6 +45,7 @@ export default function PostJobScreen() {
   const [startTime, setStartTime] = useState('10:00');
   const [endTime, setEndTime] = useState('13:00');
   const [loading, setLoading] = useState(false);
+  const isUserBlocked = Boolean(user?.blockedUntil && new Date(user.blockedUntil).getTime() > Date.now());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Refresh user verification status from server on mount and ensure RECRUITER mode
@@ -139,6 +140,10 @@ export default function PostJobScreen() {
 
   const handlePost = async () => {
     let currentUser = user;
+    if (isUserBlocked) {
+      Alert.alert('Account Blocked', 'You cannot post gigs while your account is blocked.');
+      return;
+    }
     if (process.env.EXPO_PUBLIC_USE_MOCK !== 'true') {
       try {
         const fresh = await userService.getMe();
@@ -209,6 +214,15 @@ export default function PostJobScreen() {
     } catch (e: any) {
       if (e?.code === 'USER_NOT_VERIFIED') {
         openVerificationGate(currentUser?.email || user?.email || '');
+      } else if (e?.code === 'USER_BLOCKED') {
+        const timeStr = e?.blockedUntil ? new Date(e.blockedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+        Alert.alert(
+          'Account Blocked',
+          `You are blocked${timeStr ? ` until ${timeStr}` : ''}. You can view gigs but cannot accept or post.`
+        );
+        if (user && e?.blockedUntil) {
+          useAuthStore.getState().setUser({ ...user, isBlocked: true, blockedUntil: e.blockedUntil });
+        }
       } else {
         Alert.alert('Post Failed', e?.message || 'Could not post gig.');
       }
@@ -547,9 +561,10 @@ export default function PostJobScreen() {
 
         {/* Submit Action */}
         <Button
-          label="Publish Gig"
+          label={isUserBlocked ? 'Account Blocked' : 'Publish Gig'}
           onPress={handlePost}
           loading={loading}
+          disabled={isUserBlocked || loading}
           variant="primary"
           size="lg"
           fullWidth

@@ -438,8 +438,10 @@ function RecruiterHome({ router, colors, typography, spacing, radii, isDark }: a
         {/* Hero Post Action Card */}
         <TouchableOpacity
           onPress={() => {
-            if (user?.isBlocked) {
-              alert('Your account is currently suspended. You cannot post gigs.');
+            const isUserBlocked = Boolean(user?.blockedUntil && new Date(user.blockedUntil).getTime() > Date.now());
+            if (isUserBlocked) {
+              const timeStr = user?.blockedUntil ? new Date(user.blockedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+              alert(`You are blocked${timeStr ? ` until ${timeStr}` : ''}. You can view gigs but cannot accept or post.`);
               return;
             }
             router.push('/(app)/post-job');

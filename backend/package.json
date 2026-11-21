@@ -8,6 +8,7 @@
     "build": "prisma generate && tsc",
     "render:build": "prisma generate && prisma migrate deploy && tsc",
     "test:real": "tsx src/tests/realBackendVerification.ts",
+    "test:cancellation": "tsx src/tests/cancellationAndBlockVerification.ts",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

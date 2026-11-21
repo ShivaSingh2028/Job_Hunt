@@ -113,6 +113,15 @@ export default function JobDetailScreen() {
         );
       } else if (code === 'OWN_JOB') {
         Alert.alert('Notice', 'You cannot accept your own job listing.');
+      } else if (code === 'USER_BLOCKED') {
+        const timeStr = err?.blockedUntil ? new Date(err.blockedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+        Alert.alert(
+          'Account Blocked',
+          `You are blocked${timeStr ? ` until ${timeStr}` : ''}. You can view gigs but cannot accept or post.`
+        );
+        if (user && err?.blockedUntil) {
+          setUser({ ...user, isBlocked: true, blockedUntil: err.blockedUntil });
+        }
       } else {
         Alert.alert('Unable to Accept', err?.message || 'Please try again.');
       }
@@ -217,6 +226,7 @@ export default function JobDetailScreen() {
   const isOwnJob = job.postedBy.id === user?.id;
   const remainingSlots = Math.max(0, job.openings - job.filledCount);
   const isShortTerm = job.type === 'SHORT_TERM';
+  const isUserBlocked = Boolean(user?.blockedUntil && new Date(user.blockedUntil).getTime() > Date.now());
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -542,10 +552,10 @@ export default function JobDetailScreen() {
           </View>
         ) : (
           <Button
-            label={remainingSlots > 0 ? 'Accept Gig' : 'Gig Filled'}
+            label={remainingSlots > 0 ? (isUserBlocked ? 'Account Blocked' : 'Accept Gig') : 'Gig Filled'}
             onPress={handleAccept}
             loading={actionLoading}
-            disabled={remainingSlots <= 0 || user?.isBlocked || user?.activeMode !== 'SEEKER'}
+            disabled={remainingSlots <= 0 || isUserBlocked || user?.activeMode !== 'SEEKER'}
             fullWidth
             size="lg"
           />

@@ -33,8 +33,8 @@
 
 ## 2. Current Phase of the UI Redesign
 
-* **Current Milestone:** **Phase 6 Completed (Code Cleanup, Startup Crash Resolution & Memory Lock)**.
-* **Status:** All core UI redesign requirements (Parts 1–4: Mode Switcher, Unified Auth, Bottom Tab Bar, Inter Typography) and Android launch fixes are complete and verified.
+* **Current Milestone:** **Phase 7 Completed (Cancellation Strikes & Dynamic Temporary Suspension Alignment)**.
+* **Status:** Recruiter cancellation strikes, 3-strike temporary suspension, dynamic clock-based unblocking, login without 403 restriction, and mobile blocked banners/button disabling are fully implemented and verified across live backend and mock services.
 
 ---
 

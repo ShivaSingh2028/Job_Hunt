@@ -104,7 +104,9 @@ export default function AppLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      {user?.isBlocked && <BlockedBanner blockedUntil={user.blockedUntil} />}
+      {(user?.isBlocked || Boolean(user?.blockedUntil && new Date(user.blockedUntil).getTime() > Date.now())) && (
+        <BlockedBanner blockedUntil={user.blockedUntil} />
+      )}
       <Tabs
         screenOptions={{
           headerShown: false,
