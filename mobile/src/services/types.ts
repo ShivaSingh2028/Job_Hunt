@@ -8,6 +8,7 @@ export interface SignupResponse {
 
 export interface ResendVerificationResponse {
   resendAvailableInSeconds: number;
+  alreadyVerified?: boolean;
 }
 
 export interface IAuthService {

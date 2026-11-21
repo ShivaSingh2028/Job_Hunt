@@ -68,6 +68,19 @@ export default function VerifyOtpScreen() {
     setStatusMessage(null);
     try {
       const res = await resendVerification(targetEmail);
+      if (res?.alreadyVerified) {
+        Alert.alert(
+          'Already Verified',
+          'This email is already verified. You can proceed directly.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => router.replace((params.next as any) || '/(app)'),
+            },
+          ]
+        );
+        return;
+      }
       setStatusMessage('Verification code sent! Please check your inbox.');
       setCooldown(res?.resendAvailableInSeconds || 30);
     } catch (err: any) {

@@ -1,4 +1,5 @@
 import dns from 'dns';
+import os from 'os';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -171,8 +172,19 @@ httpServer.on('error', (err: NodeJS.ErrnoException) => {
 
 // Start listening on 0.0.0.0
 httpServer.listen(PORT, '0.0.0.0', async () => {
+  const nets = os.networkInterfaces();
+  let detectedIp = 'localhost';
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.family === 'IPv4' && !net.internal) {
+        detectedIp = net.address;
+        break;
+      }
+    }
+  }
+
   console.log(`🚀 JobHunt Backend REST & Real-Time API running at http://0.0.0.0:${PORT}/api/v1`);
-  console.log(`📡 Local Network: http://10.10.134.145:${PORT}/api/v1`);
+  console.log(`📡 Local Network: http://${detectedIp}:${PORT}/api/v1`);
   console.log(`💻 Local Machine: http://localhost:${PORT}/api/v1`);
 
   // Normalize existing database user emails to lowercase on startup

@@ -278,6 +278,52 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
   });
 
   if (existing) {
+    if (!existing.isVerified) {
+      // User registered previously but did not complete email verification.
+      // Refresh password/name and send a new verification code.
+      const passwordHash = await bcrypt.hash(password, 10);
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpHashed = await bcrypt.hash(otp, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: name.trim(),
+          passwordHash,
+          phone: phone ? phone.trim() : existing.phone,
+          verificationOtp: otpHashed,
+          verificationOtpExpiresAt: expiresAt,
+        },
+      });
+
+      otpStateMap.set(normalized, {
+        attempts: 0,
+        lastSentAt: Date.now(),
+      });
+
+      const mailResult = await sendOtpEmail(normalized, otp);
+      if (!mailResult.sent) {
+        console.error(`[AUTH SIGNUP RESEND] Email delivery failed for ${normalized}:`, mailResult.error || mailResult.reason);
+        return sendError(
+          res,
+          'EMAIL_SEND_FAILED',
+          mailResult.error || "We couldn't send the email. Try again.",
+          503
+        );
+      }
+
+      return sendSuccess(
+        res,
+        {
+          email: normalized,
+          verificationRequired: true,
+          resendAvailableInSeconds: 30,
+        },
+        200
+      );
+    }
+
     return sendError(res, 'EMAIL_ALREADY_REGISTERED', 'This email is already registered.', 409);
   }
 
@@ -418,7 +464,7 @@ authRouter.post('/resend-verification', async (req: Request, res: Response) => {
   }
 
   if (user.isVerified) {
-    return sendSuccess(res, { resendAvailableInSeconds: 0 });
+    return sendSuccess(res, { resendAvailableInSeconds: 0, alreadyVerified: true });
   }
 
   const state = otpStateMap.get(normalized) || { attempts: 0, lastSentAt: 0 };
