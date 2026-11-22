@@ -238,12 +238,22 @@ export function UnifiedAuthScreen({ initialTab = 'login' }: Props) {
     } catch (err: any) {
       const code = err?.code;
       if (code === 'EMAIL_NOT_VERIFIED') {
+        let sentOk = false;
         try {
           await resendVerification(normalizedEmail);
-        } catch {}
+          sentOk = true;
+        } catch (sendErr: any) {
+          if (sendErr?.status === 503 || sendErr?.code === 'EMAIL_SEND_FAILED') {
+            setBannerError({
+              variant: 'danger',
+              message: "We couldn't deliver the verification email right now. Please verify your connection or try again shortly.",
+            });
+            return;
+          }
+        }
         router.push({
           pathname: '/(auth)/verify-otp',
-          params: { email: normalizedEmail, next: '/(app)', autoSent: 'true' },
+          params: { email: normalizedEmail, next: '/(app)', autoSent: sentOk ? 'true' : 'false' },
         } as any);
       } else if (code === 'UNAUTHORIZED') {
         setLoginErrors({ password: 'Incorrect password. Please try again.' });

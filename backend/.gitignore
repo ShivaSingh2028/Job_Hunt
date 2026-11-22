@@ -1,5 +1,9 @@
 node_modules/
 dist/
 dev.db-journal
+*.db
+*.sqlite
 *.log
 .env
+.env.*
+!.env.example

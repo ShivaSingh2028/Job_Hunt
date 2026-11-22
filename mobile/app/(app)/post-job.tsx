@@ -89,16 +89,24 @@ export default function PostJobScreen() {
         {
           text: 'Verify Now',
           onPress: async () => {
+            let sentOk = false;
             try {
               if (emailToVerify) {
                 await authService.resendVerification(emailToVerify);
+                sentOk = true;
               }
-            } catch {
-              // Ignore resend error and continue to OTP screen
+            } catch (sendErr: any) {
+              if (sendErr?.status === 503 || sendErr?.code === 'EMAIL_SEND_FAILED') {
+                Alert.alert(
+                  'Delivery Failed',
+                  "We couldn't deliver the verification email right now. Please check your internet connection and try again."
+                );
+                return;
+              }
             }
             router.push({
               pathname: '/(auth)/verify-otp',
-              params: { email: emailToVerify, next: '/(app)/post-job', autoSent: 'true' },
+              params: { email: emailToVerify, next: '/(app)/post-job', autoSent: sentOk ? 'true' : 'false' },
             } as any);
           },
         },

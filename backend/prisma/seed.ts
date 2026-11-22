@@ -4,6 +4,11 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== 'true') {
+    console.warn('⚠️ Seeding is strictly disabled in production environments. Set ALLOW_SEED=true to override.');
+    return;
+  }
+
   console.log('Seeding JobHunt database...');
 
   // NOTE: Never delete real users or real database records during seeding!

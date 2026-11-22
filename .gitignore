@@ -9,11 +9,14 @@ dist/
 */.expo/
 
 # Environment files
-.env.local
-.env.*.local
+.env
+.env.*
+!.env.example
 *.zip
 
 # Database
+*.db
+*.sqlite
 dev.db-journal
 *.sqlite-journal
 

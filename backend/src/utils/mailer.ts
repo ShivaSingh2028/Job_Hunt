@@ -5,6 +5,7 @@ interface SendMailResult {
   provider?: string;
   reason?: string;
   error?: string;
+  messageId?: string;
 }
 
 type MailTransporter = ReturnType<typeof nodemailer.createTransport>;
@@ -160,7 +161,7 @@ async function sendViaResend(toEmail: string, otp: string, subject: string, html
     }
 
     console.log(`[RESEND SUCCESS] 📧 Dispatched verification email to ${toEmail}. Id: ${data?.id}`);
-    return { sent: true, provider: 'resend' };
+    return { sent: true, provider: 'resend', messageId: data?.id };
   } catch (netErr: any) {
     logDevOnlyOtp(toEmail, otp, netErr?.message || 'HTTPS request failed');
     return { sent: false, provider: 'resend', error: netErr?.message || 'HTTPS request to Resend failed' };
@@ -206,7 +207,7 @@ async function sendViaBrevo(toEmail: string, otp: string, subject: string, htmlC
     }
 
     console.log(`[BREVO SUCCESS] 📧 Dispatched verification email to ${toEmail}. MessageId: ${data?.messageId}`);
-    return { sent: true, provider: 'brevo' };
+    return { sent: true, provider: 'brevo', messageId: data?.messageId };
   } catch (netErr: any) {
     logDevOnlyOtp(toEmail, otp, netErr?.message || 'HTTPS request failed');
     return { sent: false, provider: 'brevo', error: netErr?.message || 'HTTPS request to Brevo failed' };
@@ -302,7 +303,7 @@ export async function sendOtpEmail(toEmail: string, otp: string): Promise<SendMa
     });
 
     console.log(`[SMTP SUCCESS] 📧 Dispatched verification email to ${toEmail}. MessageId: ${info.messageId}`);
-    return { sent: true, provider: 'smtp' };
+    return { sent: true, provider: 'smtp', messageId: info.messageId };
   } catch (error: any) {
     console.error(`[SMTP ERROR] Failed to send email to ${toEmail}:`, error?.message || error);
     logDevOnlyOtp(toEmail, otp, error?.message || 'SMTP delivery failed');
