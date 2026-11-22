@@ -32,8 +32,8 @@
 cd backend
 npm run dev
 ```
-> API will run at `http://localhost:8080/api/v1` (and `http://10.162.68.159:8080/api/v1` for your phone).
-> SQLite database `backend/prisma/dev.db` is pre-seeded and ready!
+> API will run at `http://localhost:8080/api/v1` (and your local Wi-Fi IP for your phone).
+> Connected to Neon PostgreSQL database.
 
 #### 2. Start the Admin Web Console (Port 5173)
 ```bash
@@ -51,22 +51,22 @@ npx expo start
 
 ---
 
-## 🔑 Demo Credentials & Accounts
+## 🔑 Demo Credentials (Offline Mock Mode Only)
 
-### Mobile App
-- **Email:** `alex@college.edu`
-- **Password:** `password123`
-- Mode: **Seeker** (can switch to Recruiter anytime from header badge)
+> ⚠️ **SECURITY NOTICE:** The credentials below are strictly for local offline mock testing (`USE_MOCK=true`). They are **NOT valid for production** and must never be used in live environments. Production databases must be initialized with secure passwords using `npm run create:admin`, and test accounts must be cleared using `npm run clean:demo -- --confirm`.
 
-- **Recruiter Account:**
-  - **Email:** `priya@college.edu`
-  - **Password:** `password123`
-  - Mode: **Recruiter**
+### Mock Demo Accounts
+- **Seeker Account (Mock):** `alex@college.edu`
+- **Recruiter Account (Mock):** `priya@college.edu`
+- **Admin Console (Mock):** `admin@jobhunt.campus`
 
-### Admin Web Console
-- **Email:** `admin@jobhunt.campus`
-- **Password:** `admin123`
-- Pre-filled automatically on the login screen for instant demo access!
+### Production Admin Account Setup
+To create your real administrator account with a secure password:
+```bash
+cd backend
+ADMIN_EMAIL="admin@yourcampus.edu" ADMIN_NAME="Campus Admin" ADMIN_PASSWORD="your-strong-password" npm run create:admin
+```
+*(The password is read strictly from the `ADMIN_PASSWORD` environment variable and never committed to code).*
 
 ---
 

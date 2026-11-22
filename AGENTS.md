@@ -111,6 +111,7 @@ Job_Hunt/
    * A seeker cannot accept two short-term gigs with overlapping scheduled times on the same date. Returns HTTP 409 with code `TIME_CONFLICT`.
 9. **Administration & Moderation:**
    * An **Admin role** exists alongside dispute **reports** (`/reports`) and an **admin action log** (`/admin/actions`) for platform auditability and moderation overrides.
+   * **Production Security:** Demo accounts and default seed passwords (`password123`, `admin123`) are strictly prohibited in production. Production admin accounts must be created using `npm run create:admin` with an environment variable `ADMIN_PASSWORD`. Seeding is blocked in production (`NODE_ENV=production`). Demo test data can be audited and purged via `npm run clean:demo`.
 10. **Payment Handling:**
     * Monetary transactions are out of scope for the app runtime; settlement is direct peer-to-peer upon task completion.
 
