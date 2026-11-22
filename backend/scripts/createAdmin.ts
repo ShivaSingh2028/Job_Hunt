@@ -9,15 +9,41 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
 dotenv.config();
 
+import readline from 'readline';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = (process.env.ADMIN_EMAIL || process.argv[2] || '').trim().toLowerCase();
-  const name = (process.env.ADMIN_NAME || process.argv[3] || 'Administrator').trim();
-  const password = (process.env.ADMIN_PASSWORD || process.argv[4] || '').trim();
+  let email = (process.env.ADMIN_EMAIL || process.argv[2] || '').trim().toLowerCase();
+  let name = (process.env.ADMIN_NAME || process.argv[3] || '').trim();
+  let password = (process.env.ADMIN_PASSWORD || process.argv[4] || '').trim();
+
+  if ((!email || !password) && process.stdin.isTTY) {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    const ask = (q: string) => new Promise<string>((res) => rl.question(q, res));
+    try {
+      if (!email) {
+        email = (await ask('Enter Admin Email: ')).trim().toLowerCase();
+      }
+      if (!name) {
+        name = (await ask('Enter Admin Name [Administrator]: ')).trim();
+      }
+      if (!password) {
+        password = (await ask('Enter Admin Password (min 10 characters): ')).trim();
+      }
+    } finally {
+      rl.close();
+    }
+  }
+
+  if (!name) {
+    name = 'Administrator';
+  }
 
   console.log('\n======================================================');
   console.log('👤 JobHunt Secure Production Admin Setup');
