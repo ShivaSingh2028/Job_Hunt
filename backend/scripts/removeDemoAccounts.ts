@@ -37,6 +37,10 @@ async function main() {
     select: { id: true, email: true, name: true },
   });
 
+  const totalAdmins = await prisma.adminUser.findMany({
+    select: { id: true, email: true, name: true, role: true },
+  });
+
   // 2. Identify Demo Users
   const demoUsers = await prisma.user.findMany({
     where: { email: { in: DEMO_USER_EMAILS } },
@@ -116,6 +120,10 @@ async function main() {
   console.log('📋 Audit Findings:');
   console.log(`• Demo Admin Accounts found: ${demoAdmins.length}`);
   demoAdmins.forEach((a) => console.log(`   - [Admin] ${a.name} (${a.email})`));
+
+  const nonDemoAdmins = totalAdmins.filter(a => !DEMO_ADMIN_EMAILS.includes(a.email.toLowerCase()));
+  console.log(`• Real Production Admin Accounts found: ${nonDemoAdmins.length}`);
+  nonDemoAdmins.forEach((a) => console.log(`   - [Admin] ${a.name} (${a.email}) [${a.role}]`));
 
   console.log(`• Demo User Accounts found : ${demoUsers.length}`);
   demoUsers.forEach((u) => console.log(`   - [User]  ${u.name} (${u.email})`));
