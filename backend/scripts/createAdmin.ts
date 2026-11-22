@@ -1,3 +1,8 @@
+import dns from 'dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
+
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -24,6 +29,12 @@ async function main() {
   if (!password || password.length < 10) {
     console.error('❌ Error: ADMIN_PASSWORD must be at least 10 characters long.');
     console.error('Set it via the ADMIN_PASSWORD environment variable.');
+    process.exit(1);
+  }
+
+  const lowerPw = password.toLowerCase();
+  if (lowerPw.includes('admin123') || lowerPw.includes('password123')) {
+    console.error('❌ Error: Insecure password. Default seed phrases ("admin123", "password123") are strictly prohibited.');
     process.exit(1);
   }
 
