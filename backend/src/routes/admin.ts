@@ -48,25 +48,12 @@ adminRouter.post('/login', async (req: Request, res: Response) => {
     where: { email: normalized },
   });
 
-  // If first time admin login and admin not found, auto-create default admin
-  if (!admin && normalized === 'admin@jobhunt.campus' && password === 'admin123') {
-    const passwordHash = await bcrypt.hash('admin123', 10);
-    admin = await prisma.adminUser.create({
-      data: {
-        email: normalized,
-        name: 'Sarah Connor',
-        passwordHash,
-        role: 'SUPER_ADMIN',
-      },
-    });
-  }
-
   if (!admin) {
     return sendError(res, 'UNAUTHORIZED', 'Invalid admin credentials', 401);
   }
 
   const valid = await bcrypt.compare(password, admin.passwordHash);
-  if (!valid && password !== 'admin123') {
+  if (!valid) {
     return sendError(res, 'UNAUTHORIZED', 'Invalid admin credentials', 401);
   }
 

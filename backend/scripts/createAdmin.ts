@@ -3,7 +3,10 @@ try {
   dns.setDefaultResultOrder('ipv4first');
 } catch {}
 
+import path from 'path';
 import dotenv from 'dotenv';
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
 dotenv.config();
 
 import bcrypt from 'bcryptjs';
